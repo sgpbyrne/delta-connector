@@ -1,0 +1,60 @@
+[versions]
+kotlin = "1.9.25"
+kafka = "3.7.0"
+parquet = "1.15.2"
+hadoop = "3.4.3"
+jackson = "2.17.2"
+avro = "1.12.0"
+azure-storage = "12.21.0"
+azure-identity = "1.15.0"
+micrometer = "1.14.4"
+slf4j = "2.0.17"
+
+# Test
+junit = "5.12.2"
+testcontainers = "1.21.3"
+mockk = "1.14.3"
+kotest = "5.9.1"
+
+# Plugins
+shadow = "8.1.1"
+
+[libraries]
+# Protocol module deps
+parquet-avro = { module = "org.apache.parquet:parquet-avro", version.ref = "parquet" }
+parquet-hadoop = { module = "org.apache.parquet:parquet-hadoop", version.ref = "parquet" }
+hadoop-common = { module = "org.apache.hadoop:hadoop-common", version.ref = "hadoop" }
+hadoop-azure = { module = "org.apache.hadoop:hadoop-azure", version.ref = "hadoop" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "jackson" }
+avro = { module = "org.apache.avro:avro", version.ref = "avro" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+
+# Kafka Connect (compileOnly — provided by Connect runtime)
+kafka-connect-api = { module = "org.apache.kafka:connect-api", version.ref = "kafka" }
+kafka-connect-json = { module = "org.apache.kafka:connect-json", version.ref = "kafka" }
+
+# Azure
+azure-storage-datalake = { module = "com.azure:azure-storage-file-datalake", version.ref = "azure-storage" }
+azure-identity = { module = "com.azure:azure-identity", version.ref = "azure-identity" }
+
+# Observability
+micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
+micrometer-otlp = { module = "io.micrometer:micrometer-registry-otlp", version.ref = "micrometer" }
+
+# Test
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+testcontainers-kafka = { module = "org.testcontainers:kafka" }
+testcontainers-mssql = { module = "org.testcontainers:mssqlserver" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
+
+[bundles]
+jackson = ["jackson-databind", "jackson-kotlin"]
+parquet = ["parquet-avro", "parquet-hadoop"]
+testing = ["junit-jupiter", "mockk", "kotest-assertions"]
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }
