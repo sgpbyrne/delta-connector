@@ -7,8 +7,8 @@ import java.io.OutputStream
  * Abstraction over the storage backend for Delta Lake transaction log and data files.
  *
  * All file I/O in the protocol module goes through this interface.
- * Implementations must provide atomic commit semantics for [writeCommit] —
- * if the version file already exists, [CommitConflictException] must be thrown.
+ * Implementations must provide atomic commit semantics for [writeCommit].
+ * If the version file already exists, [CommitConflictException] must be thrown.
  *
  * Implementations:
  * - [LocalFileSystemLogStore] for testing (uses local filesystem)

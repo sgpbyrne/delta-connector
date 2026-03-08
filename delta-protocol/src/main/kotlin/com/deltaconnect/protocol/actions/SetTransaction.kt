@@ -1,7 +1,7 @@
 package com.deltaconnect.protocol.actions
 
 /**
- * Records an application-specific transaction identifier for exactly-once semantics.
+ * Records an application specific transaction identifier for exactly-once semantics.
  *
  * Used by this connector to store Kafka offsets atomically in the Delta commit.
  * On restart, the latest SetTransaction for a given appId indicates the last

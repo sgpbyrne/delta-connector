@@ -3,7 +3,7 @@ package com.deltaconnect.protocol.actions
 /**
  * Defines the table schema, format, partition columns, and configuration.
  *
- * Only the latest MetaData action in the log is active — each new MetaData
+ * Only the latest MetaData action in the log is active. Each new MetaData
  * replaces the previous one entirely.
  *
  * @property id Unique table identifier (UUID string).
