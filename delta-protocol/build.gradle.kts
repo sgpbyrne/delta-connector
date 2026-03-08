@@ -9,4 +9,11 @@ dependencies {
         exclude(group = "org.eclipse.jetty")
     }
     implementation(libs.avro)
+
+    testImplementation(libs.hadoop.mapreduce.client.core) {
+        exclude(group = "org.apache.curator")
+        exclude(group = "org.apache.zookeeper")
+        exclude(group = "org.apache.kerby")
+        exclude(group = "org.eclipse.jetty")
+    }
 }
