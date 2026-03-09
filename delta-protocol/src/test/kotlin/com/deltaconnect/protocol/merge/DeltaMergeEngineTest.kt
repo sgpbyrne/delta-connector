@@ -64,7 +64,6 @@ class DeltaMergeEngineTest {
         op: MergeOperation
     ): SourceRecord = SourceRecord(record(id, name, value), op)
 
-    /** Write records to a Parquet file and return the AddFile with real stats. */
     private fun writeDataFile(
         path: String,
         records: List<GenericRecord>
@@ -96,11 +95,9 @@ class DeltaMergeEngineTest {
     private fun engine(): DeltaMergeEngine =
         DeltaMergeEngine(logStore, schema, mergeKeyNames, tablePath)
 
-    /** Read all records from an AddFile and return as list. */
     private fun readRecords(addFile: AddFile): List<GenericRecord> =
         reader.read(addFile.path)
 
-    /** Extract ids from a list of GenericRecords. */
     private fun extractIds(records: List<GenericRecord>): List<Int> =
         records.map { it.get("id") as Int }
 
@@ -403,34 +400,16 @@ class DeltaMergeEngineTest {
     @Nested
     inner class CompositeKeys {
 
-        private val compositeSchema = DeltaType.StructType(
-            listOf(
-                StructField("tenant_id", DeltaType.StringType, nullable = false),
-                StructField("id", DeltaType.IntegerType, nullable = false),
-                StructField("name", DeltaType.StringType, nullable = true)
-            )
-        )
-        private val compositeAvro = AvroToDeltaConverter.toAvroSchema(compositeSchema)
-
-        private fun compositeRecord(
-            tenantId: String,
-            id: Int,
-            name: String?
-        ): GenericRecord = GenericRecordBuilder(compositeAvro)
-            .set("tenant_id", tenantId)
-            .set("id", id)
-            .set("name", name)
-            .build()
-
         @Test
         fun `merge with two-column composite key`() {
+            val compositeSchema = CompositeKeyFixtures.schema
             val writer = ParquetFileWriter(logStore, compositeSchema)
             val result = writer.write(
                 "$tablePath/part-composite.parquet",
                 listOf(
-                    compositeRecord("A", 1, "Alice"),
-                    compositeRecord("A", 2, "Bob"),
-                    compositeRecord("B", 1, "Charlie")
+                    CompositeKeyFixtures.record("A", 1, "Alice"),
+                    CompositeKeyFixtures.record("A", 2, "Bob"),
+                    CompositeKeyFixtures.record("B", 1, "Charlie")
                 )
             )
             val file = AddFile(
@@ -455,11 +434,11 @@ class DeltaMergeEngineTest {
 
             val engine = DeltaMergeEngine(
                 logStore, compositeSchema,
-                listOf("tenant_id", "id"), tablePath
+                CompositeKeyFixtures.keyNames, tablePath
             )
             val source = listOf(
                 SourceRecord(
-                    compositeRecord("A", 1, "ALICE"),
+                    CompositeKeyFixtures.record("A", 1, "ALICE"),
                     MergeOperation.UPDATE
                 )
             )

@@ -8,7 +8,6 @@ import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.apache.avro.generic.GenericRecordBuilder
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
@@ -165,42 +164,21 @@ class RowMergerTest {
     @Nested
     inner class CompositeKeyMerge {
 
-        private val compositeSchema = DeltaType.StructType(
-            listOf(
-                StructField("tenant_id", DeltaType.StringType, nullable = false),
-                StructField("id", DeltaType.IntegerType, nullable = false),
-                StructField("name", DeltaType.StringType, nullable = true)
-            )
-        )
-        private val compositeAvro = AvroToDeltaConverter.toAvroSchema(compositeSchema)
-        private val compositeKeyNames = listOf("tenant_id", "id")
-
-        private fun compositeRecord(
-            tenantId: String,
-            id: Int,
-            name: String?
-        ): org.apache.avro.generic.GenericRecord =
-            GenericRecordBuilder(compositeAvro)
-                .set("tenant_id", tenantId)
-                .set("id", id)
-                .set("name", name)
-                .build()
-
         @Test
         fun `matches on composite key correctly`() {
-            val sourceRec = compositeRecord("A", 1, "ALICE")
+            val sourceRec = CompositeKeyFixtures.record("A", 1, "ALICE")
             val sourceIndex = mapOf(
                 MergeKey(listOf("A", 1)) to IndexedSourceRecord(
                     sourceRec, MergeOperation.UPDATE, 0
                 )
             )
-            val merger = RowMerger(sourceIndex, compositeKeyNames)
+            val merger = RowMerger(sourceIndex, CompositeKeyFixtures.keyNames)
             val matchedKeys = mutableSetOf<MergeKey>()
 
             val existing = listOf(
-                compositeRecord("A", 1, "Alice"),
-                compositeRecord("A", 2, "Bob"),
-                compositeRecord("B", 1, "Charlie")
+                CompositeKeyFixtures.record("A", 1, "Alice"),
+                CompositeKeyFixtures.record("A", 2, "Bob"),
+                CompositeKeyFixtures.record("B", 1, "Charlie")
             )
             val result = merger.mergeFile(existing.iterator(), matchedKeys)
 

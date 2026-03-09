@@ -218,10 +218,9 @@ class DeltaMergeEngine(
         sourceRecords: List<SourceRecord>
     ): Map<MergeKey, IndexedSourceRecord> {
         val index = HashMap<MergeKey, IndexedSourceRecord>(sourceRecords.size)
-        val rowMerger = RowMerger(emptyMap(), mergeKeyNames)
 
         for ((ordinal, source) in sourceRecords.withIndex()) {
-            val key = rowMerger.extractKey(source.record)
+            val key = extractMergeKey(source.record, mergeKeyNames)
             val existing = index[key]
             if (existing == null || ordinal > existing.ordinal) {
                 index[key] = IndexedSourceRecord(

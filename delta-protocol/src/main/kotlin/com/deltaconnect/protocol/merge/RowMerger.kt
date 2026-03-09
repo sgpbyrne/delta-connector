@@ -4,6 +4,20 @@ import org.apache.avro.generic.GenericRecord
 import org.slf4j.LoggerFactory
 
 /**
+ * Extract the merge key from a [GenericRecord] by column names.
+ *
+ * Avro [CharSequence] values are normalized to [String]
+ * for consistent [MergeKey.equals] and [MergeKey.hashCode].
+ */
+fun extractMergeKey(record: GenericRecord, mergeKeyNames: List<String>): MergeKey {
+    val values = mergeKeyNames.map { name ->
+        val value = record.get(name)
+        if (value is CharSequence) value.toString() else value
+    }
+    return MergeKey(values)
+}
+
+/**
  * Row-level merge logic.
  *
  * For each existing row:
@@ -71,19 +85,8 @@ class RowMerger(
         return FileMergeResult(outputRows, updatedCount, deletedCount, copiedCount)
     }
 
-    /**
-     * Extract the merge key from a [GenericRecord].
-     *
-     * Avro [CharSequence] values are normalized to [String]
-     * for consistent [MergeKey.equals] and [MergeKey.hashCode].
-     */
-    fun extractKey(record: GenericRecord): MergeKey {
-        val values = mergeKeyNames.map { name ->
-            val value = record.get(name)
-            if (value is CharSequence) value.toString() else value
-        }
-        return MergeKey(values)
-    }
+    /** Extract the merge key from a [GenericRecord] using this merger's key names. */
+    fun extractKey(record: GenericRecord): MergeKey = extractMergeKey(record, mergeKeyNames)
 
     companion object {
         private val logger = LoggerFactory.getLogger(RowMerger::class.java)

@@ -2,7 +2,6 @@ package com.deltaconnect.protocol.schema
 
 import org.apache.avro.LogicalTypes
 import org.apache.avro.Schema as AvroSchema
-import org.apache.avro.SchemaBuilder
 
 /**
  * Bidirectional conversion between Delta Lake schemas and Apache Avro schemas.
@@ -94,7 +93,6 @@ object AvroToDeltaConverter {
     }
 
     private fun avroToDeltaType(schema: AvroSchema): DeltaType {
-        // Check logical types first
         val logicalType = schema.logicalType
         if (logicalType != null) {
             return when (logicalType.name) {

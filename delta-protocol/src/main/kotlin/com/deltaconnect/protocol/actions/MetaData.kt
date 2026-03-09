@@ -9,7 +9,7 @@ package com.deltaconnect.protocol.actions
  * @property id Unique table identifier (UUID string).
  * @property name Optional human-readable table name.
  * @property description Optional table description.
- * @property format Data file format (always Parquet for this connector).
+ * @property format Data file format (default: Parquet).
  * @property schemaString Delta schema as a JSON string.
  * @property partitionColumns Columns used for Hive-style partitioning.
  * @property configuration Table properties (e.g., delta.appendOnly).

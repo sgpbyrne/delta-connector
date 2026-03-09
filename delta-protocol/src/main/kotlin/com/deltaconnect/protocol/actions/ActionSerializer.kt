@@ -17,7 +17,7 @@ import com.fasterxml.jackson.module.kotlin.readValue
  * {"metaData": {"id": "...", ...}}
  * ```
  *
- * Multiple actions form a commit file (newline-delimited JSON).
+ * Multiple actions form a commit file.
  */
 object ActionSerializer {
 
@@ -66,4 +66,7 @@ object ActionSerializer {
 
     /** Format a commit version as a zero-padded 20-digit filename. */
     fun commitFileName(version: Long): String = "%020d.json".format(version)
+
+    /** Format a checkpoint version as a zero-padded 20-digit Parquet filename. */
+    fun checkpointFileName(version: Long): String = "%020d.checkpoint.parquet".format(version)
 }

@@ -588,21 +588,5 @@ class StatsCollectorTest {
         }
     }
 
-    private fun parseStats(json: String): ParsedStats {
-        val map: Map<String, Any> = objectMapper.readValue(json)
-        @Suppress("UNCHECKED_CAST")
-        return ParsedStats(
-            numRecords = (map["numRecords"] as Number).toLong(),
-            minValues = map["minValues"] as Map<String, Any>,
-            maxValues = map["maxValues"] as Map<String, Any>,
-            nullCount = (map["nullCount"] as Map<String, Any>).mapValues { (_, v) -> (v as Number).toLong() }
-        )
-    }
-
-    data class ParsedStats(
-        val numRecords: Long,
-        val minValues: Map<String, Any>,
-        val maxValues: Map<String, Any>,
-        val nullCount: Map<String, Long>
-    )
+    private fun parseStats(json: String): ParsedStats = ParsedStats.fromJson(json)
 }

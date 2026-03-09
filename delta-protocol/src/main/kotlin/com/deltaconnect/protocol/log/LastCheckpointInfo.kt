@@ -23,6 +23,9 @@ data class LastCheckpointInfo(
     val size: Long? = null,
     val parts: Int? = null
 ) {
+    /** Serialize this checkpoint info to JSON for writing to `_last_checkpoint`. */
+    fun toJson(): String = mapper.writeValueAsString(this)
+
     companion object {
         private val mapper = jacksonObjectMapper()
 
