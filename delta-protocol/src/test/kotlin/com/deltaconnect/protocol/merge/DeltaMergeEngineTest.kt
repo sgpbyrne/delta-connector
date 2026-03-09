@@ -202,7 +202,6 @@ class DeltaMergeEngineTest {
             result.filesRewritten shouldBe 1
             result.removeFiles shouldHaveSize 1
             result.removeFiles[0].path shouldBe file.path
-            // No AddFile since all rows deleted
             result.addFiles.shouldBeEmpty()
         }
 
@@ -559,6 +558,62 @@ class DeltaMergeEngineTest {
             val newRecords = readRecords(result.addFiles[0])
             newRecords[0].get("name") shouldBe null
             newRecords[0].get("value") shouldBe null
+        }
+
+        @Test
+        fun `null merge key values are treated as equal for matching`() {
+            val nullKeySchema = DeltaType.StructType(
+                listOf(
+                    StructField("key", DeltaType.StringType, nullable = true),
+                    StructField("value", DeltaType.IntegerType, nullable = true)
+                )
+            )
+            val nullKeyAvro = AvroToDeltaConverter.toAvroSchema(nullKeySchema)
+
+            val existingRecord = GenericRecordBuilder(nullKeyAvro)
+                .set("key", null)
+                .set("value", 100)
+                .build()
+            val writer = ParquetFileWriter(logStore, nullKeySchema)
+            val writeResult = writer.write("$tablePath/part-null-key.parquet", listOf(existingRecord))
+            val file = AddFile(
+                path = writeResult.filePath,
+                size = writeResult.fileSize,
+                modificationTime = System.currentTimeMillis(),
+                dataChange = true,
+                stats = writeResult.statsJson
+            )
+            val snap = DeltaSnapshot(
+                version = 0L,
+                activeFiles = setOf(file),
+                metaData = MetaData(
+                    id = "test",
+                    format = Format(),
+                    schemaString = DeltaSchema.toJson(nullKeySchema)
+                ),
+                protocol = Protocol(),
+                transactions = emptyMap(),
+                commitInfo = null
+            )
+
+            val updatedRecord = GenericRecordBuilder(nullKeyAvro)
+                .set("key", null)
+                .set("value", 999)
+                .build()
+            val source = listOf(
+                SourceRecord(updatedRecord, MergeOperation.UPDATE)
+            )
+
+            val engine = DeltaMergeEngine(logStore, nullKeySchema, listOf("key"), tablePath)
+            val result = engine.merge(snap, source)
+
+            result.recordsUpdated shouldBe 1
+            result.recordsInserted shouldBe 0
+            result.filesRewritten shouldBe 1
+            val newRecords = reader.read(result.addFiles[0].path)
+            newRecords shouldHaveSize 1
+            newRecords[0].get("key") shouldBe null
+            newRecords[0].get("value") shouldBe 999
         }
     }
 

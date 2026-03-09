@@ -15,6 +15,7 @@ import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -142,13 +143,25 @@ class DeltaTableTest {
         }
 
         @Test
+        fun `stores engine info in commit info`() {
+            val table = DeltaTable.createOrReplace(
+                logStore, tablePath, simpleSchema,
+                engineInfo = "delta-cdc-connector/1.0"
+            )
+            val snapshot = table.snapshot()
+
+            snapshot.commitInfo.shouldNotBeNull()
+            snapshot.commitInfo!!.engineInfo shouldBe "delta-cdc-connector/1.0"
+        }
+
+        @Test
         fun `generates unique table id`() {
             val table1 = DeltaTable.createOrReplace(logStore, "table-1", simpleSchema)
             val table2 = DeltaTable.createOrReplace(logStore, "table-2", simpleSchema)
 
             val id1 = table1.snapshot().metaData!!.id
             val id2 = table2.snapshot().metaData!!.id
-            (id1 != id2) shouldBe true
+            id1 shouldNotBe id2
         }
 
         @Test

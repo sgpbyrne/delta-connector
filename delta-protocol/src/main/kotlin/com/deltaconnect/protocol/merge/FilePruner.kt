@@ -75,12 +75,6 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
         return false
     }
 
-    /**
-     * Check whether the file's range and source range have no overlap
-     * for a given column.
-     *
-     * No overlap when: fileMax < sourceMin OR fileMin > sourceMax
-     */
     private fun hasNoOverlap(
         fileMin: JsonNode,
         fileMax: JsonNode,
@@ -100,15 +94,6 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
         return false
     }
 
-    /**
-     * Compare stats JSON value to source key bound value.
-     *
-     * Returns negative if stat < source, zero if equal, positive if stat > source.
-     * Returns null if comparison is not possible (type mismatch, unsupported type).
-     *
-     * The comparison logic mirrors [StatsCollector]'s serialization Format
-     *
-     */
     @Suppress("UNCHECKED_CAST")
     private fun compareStatToValue(
         statNode: JsonNode,
@@ -180,14 +165,12 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
                 is DeltaType.MapType,
                 is DeltaType.StructType -> null
             }
-        } catch (_: Exception) {
-            null // Comparison failed, cannot prune
+        } catch (e: Exception) {
+            logger.debug("Stats comparison failed for {}: {}", fieldType, e.message)
+            null
         }
     }
 
-    /**
-     * Resolve a potentially dot-separated column name against nested JSON.
-     */
     private fun resolveNestedNode(node: JsonNode, path: String): JsonNode? {
         val parts = path.split('.')
         var current: JsonNode? = node
@@ -211,10 +194,6 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
         private val logger = LoggerFactory.getLogger(FilePruner::class.java)
         private val objectMapper = jacksonObjectMapper()
 
-        /**
-         * Parse an ISO 8601 UTC timestamp string to epoch microseconds.
-         * Matches the format produced by [StatsCollector]
-         */
         internal fun parseTimestampToMicros(isoString: String): Long? {
             return try {
                 val odt = OffsetDateTime.parse(isoString)
@@ -226,9 +205,6 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
             }
         }
 
-        /**
-         * Parse an ISO date string (yyyy-MM-dd) to epoch days.
-         */
         internal fun parseDateToEpochDays(isoDate: String): Int? {
             return try {
                 LocalDate.parse(isoDate).toEpochDay().toInt()

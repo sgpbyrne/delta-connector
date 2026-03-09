@@ -34,3 +34,27 @@ data class StructField(
     val nullable: Boolean = true,
     val metadata: Map<String, Any> = emptyMap()
 )
+
+/**
+ * The canonical Delta Lake type name string (e.g. "string", "integer", "decimal(10,2)").
+ *
+ * Matches the names used in Delta's JSON schema serialization format.
+ */
+val DeltaType.typeName: String
+    get() = when (this) {
+        is DeltaType.StringType -> "string"
+        is DeltaType.LongType -> "long"
+        is DeltaType.IntegerType -> "integer"
+        is DeltaType.ShortType -> "short"
+        is DeltaType.ByteType -> "byte"
+        is DeltaType.FloatType -> "float"
+        is DeltaType.DoubleType -> "double"
+        is DeltaType.BooleanType -> "boolean"
+        is DeltaType.BinaryType -> "binary"
+        is DeltaType.DateType -> "date"
+        is DeltaType.TimestampType -> "timestamp"
+        is DeltaType.DecimalType -> "decimal($precision,$scale)"
+        is DeltaType.ArrayType -> "array"
+        is DeltaType.MapType -> "map"
+        is DeltaType.StructType -> "struct"
+    }

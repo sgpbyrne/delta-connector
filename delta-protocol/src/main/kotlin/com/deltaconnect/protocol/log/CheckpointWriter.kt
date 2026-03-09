@@ -7,7 +7,6 @@ import com.deltaconnect.protocol.actions.AddFile
 import com.deltaconnect.protocol.actions.MetaData
 import com.deltaconnect.protocol.actions.Protocol
 import com.deltaconnect.protocol.actions.SetTransaction
-import com.deltaconnect.protocol.parquet.ByteArrayBackedInputFile
 import com.deltaconnect.protocol.parquet.OutputStreamBackedOutputFile
 import com.deltaconnect.protocol.storage.DeltaLogStore
 import org.apache.avro.Schema
@@ -162,81 +161,67 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
 
         val add = record.get("add") as? GenericRecord
         if (add != null) {
-            @Suppress("UNCHECKED_CAST")
-            val partitionValues = (add.get("partitionValues") as Map<CharSequence, CharSequence>)
-                .map { (k, v) -> k.toString() to v.toString() }
-                .toMap()
-
-            @Suppress("UNCHECKED_CAST")
-            val tags = (add.get("tags") as? Map<CharSequence, CharSequence>)
-                ?.map { (k, v) -> k.toString() to v.toString() }
-                ?.toMap()
-
             return AddFile(
                 path = add.get("path").toString(),
-                partitionValues = partitionValues,
+                partitionValues = add.toStringMap("partitionValues"),
                 size = add.get("size") as Long,
                 modificationTime = add.get("modificationTime") as Long,
                 dataChange = add.get("dataChange") as Boolean,
                 stats = add.get("stats")?.toString(),
-                tags = tags
+                tags = add.toStringMapOrNull("tags")
             )
         }
 
         val meta = record.get("metaData") as? GenericRecord
         if (meta != null) {
             val format = meta.get("format") as GenericRecord
-            @Suppress("UNCHECKED_CAST")
-            val options = (format.get("options") as Map<CharSequence, CharSequence>)
-                .map { (k, v) -> k.toString() to v.toString() }
-                .toMap()
-
-            @Suppress("UNCHECKED_CAST")
-            val configuration = (meta.get("configuration") as Map<CharSequence, CharSequence>)
-                .map { (k, v) -> k.toString() to v.toString() }
-                .toMap()
-
-            @Suppress("UNCHECKED_CAST")
-            val partitionColumns = (meta.get("partitionColumns") as List<CharSequence>)
-                .map { it.toString() }
-
             return MetaData(
                 id = meta.get("id").toString(),
                 name = meta.get("name")?.toString(),
                 description = meta.get("description")?.toString(),
                 format = com.deltaconnect.protocol.actions.Format(
                     provider = format.get("provider").toString(),
-                    options = options
+                    options = format.toStringMap("options")
                 ),
                 schemaString = meta.get("schemaString").toString(),
-                partitionColumns = partitionColumns,
-                configuration = configuration,
+                partitionColumns = meta.toStringList("partitionColumns"),
+                configuration = meta.toStringMap("configuration"),
                 createdTime = meta.get("createdTime") as? Long
             )
         }
 
         val proto = record.get("protocol") as? GenericRecord
         if (proto != null) {
-            @Suppress("UNCHECKED_CAST")
-            val readerFeatures = (proto.get("readerFeatures") as? List<CharSequence>)
-                ?.map { it.toString() }
-                ?.toSet()
-
-            @Suppress("UNCHECKED_CAST")
-            val writerFeatures = (proto.get("writerFeatures") as? List<CharSequence>)
-                ?.map { it.toString() }
-                ?.toSet()
-
             return Protocol(
                 minReaderVersion = proto.get("minReaderVersion") as Int,
                 minWriterVersion = proto.get("minWriterVersion") as Int,
-                readerFeatures = readerFeatures,
-                writerFeatures = writerFeatures
+                readerFeatures = proto.toStringSetOrNull("readerFeatures"),
+                writerFeatures = proto.toStringSetOrNull("writerFeatures")
             )
         }
 
         return null
     }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun GenericRecord.toStringMap(field: String): Map<String, String> =
+        (get(field) as Map<CharSequence, CharSequence>)
+            .map { (k, v) -> k.toString() to v.toString() }
+            .toMap()
+
+    @Suppress("UNCHECKED_CAST")
+    private fun GenericRecord.toStringMapOrNull(field: String): Map<String, String>? =
+        (get(field) as? Map<CharSequence, CharSequence>)
+            ?.map { (k, v) -> k.toString() to v.toString() }
+            ?.toMap()
+
+    @Suppress("UNCHECKED_CAST")
+    private fun GenericRecord.toStringList(field: String): List<String> =
+        (get(field) as List<CharSequence>).map { it.toString() }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun GenericRecord.toStringSetOrNull(field: String): Set<String>? =
+        (get(field) as? List<CharSequence>)?.map { it.toString() }?.toSet()
 
     private fun writeParquetFile(filePath: String, records: List<GenericRecord>) {
         val outputStream = logStore.createDataFile(filePath)
@@ -255,10 +240,7 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
     }
 
     private fun readParquetFile(filePath: String): List<GenericRecord> {
-        val inputStream = logStore.readDataFile(filePath)
-        val bytes = inputStream.use { it.readAllBytes() }
-        val inputFile = ByteArrayBackedInputFile(bytes)
-
+        val inputFile = logStore.readDataFileAsInputFile(filePath)
         val reader = AvroParquetReader.builder<GenericRecord>(inputFile).build()
         val records = mutableListOf<GenericRecord>()
 
@@ -275,23 +257,14 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
     companion object {
         private val logger = LoggerFactory.getLogger(CheckpointWriter::class.java)
 
-        /** Default checkpoint interval: write a checkpoint every N commits. */
         const val DEFAULT_CHECKPOINT_INTERVAL: Long = 10
 
-        /** Construct the checkpoint file path for a given table and version. */
         fun checkpointFilePath(tablePath: String, version: Long): String =
             "$tablePath/_delta_log/${ActionSerializer.checkpointFileName(version)}"
 
-        /** Extract the non-null record schema from a nullable union field. */
         private fun extractRecordSchema(parentSchema: Schema, fieldName: String): Schema =
             parentSchema.getField(fieldName).schema().types[1]
 
-        /**
-         * Avro schema for V1 checkpoint rows.
-         *
-         * Each row has nullable top-level fields for each action type.
-         * Exactly one field is non-null per row.
-         */
         private val CHECKPOINT_SCHEMA_JSON = """
         {
           "type": "record",

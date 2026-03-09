@@ -54,7 +54,6 @@ object DeltaSchema {
     }
 
     private fun parsePrimitiveType(typeName: String): DeltaType {
-        // Handle decimal(precision, scale) pattern
         val decimalMatch = DECIMAL_PATTERN.matchEntire(typeName)
         if (decimalMatch != null) {
             val (precision, scale) = decimalMatch.destructured
@@ -111,21 +110,10 @@ object DeltaSchema {
 
     private fun typeToNode(type: DeltaType): JsonNode {
         return when (type) {
-            is DeltaType.StringType -> mapper.nodeFactory.textNode("string")
-            is DeltaType.LongType -> mapper.nodeFactory.textNode("long")
-            is DeltaType.IntegerType -> mapper.nodeFactory.textNode("integer")
-            is DeltaType.ShortType -> mapper.nodeFactory.textNode("short")
-            is DeltaType.ByteType -> mapper.nodeFactory.textNode("byte")
-            is DeltaType.FloatType -> mapper.nodeFactory.textNode("float")
-            is DeltaType.DoubleType -> mapper.nodeFactory.textNode("double")
-            is DeltaType.BooleanType -> mapper.nodeFactory.textNode("boolean")
-            is DeltaType.BinaryType -> mapper.nodeFactory.textNode("binary")
-            is DeltaType.DateType -> mapper.nodeFactory.textNode("date")
-            is DeltaType.TimestampType -> mapper.nodeFactory.textNode("timestamp")
-            is DeltaType.DecimalType -> mapper.nodeFactory.textNode("decimal(${type.precision},${type.scale})")
             is DeltaType.StructType -> structTypeToNode(type)
             is DeltaType.ArrayType -> arrayTypeToNode(type)
             is DeltaType.MapType -> mapTypeToNode(type)
+            else -> mapper.nodeFactory.textNode(type.typeName)
         }
     }
 

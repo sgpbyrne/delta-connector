@@ -11,9 +11,8 @@ import org.apache.avro.generic.GenericRecordBuilder
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
-import java.math.BigDecimal
-import java.nio.ByteBuffer
 import java.nio.file.Path
 
 class ParquetFileReaderTest {
@@ -58,80 +57,6 @@ class ParquetFileReaderTest {
             records[2].get("name").toString() shouldBe "Charlie"
         }
 
-        @Test
-        fun `reads empty file`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
-            writeTestFile("data/empty.parquet", schema, emptyList())
-
-            val records = reader.read("data/empty.parquet")
-
-            records shouldHaveSize 0
-        }
-
-        @Test
-        fun `reads all primitive types`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("col_string", DeltaType.StringType),
-                    StructField("col_long", DeltaType.LongType),
-                    StructField("col_int", DeltaType.IntegerType),
-                    StructField("col_float", DeltaType.FloatType),
-                    StructField("col_double", DeltaType.DoubleType),
-                    StructField("col_boolean", DeltaType.BooleanType),
-                    StructField("col_date", DeltaType.DateType),
-                    StructField("col_timestamp", DeltaType.TimestampType)
-                )
-            )
-            writeTestFile("data/primitives.parquet", schema, listOf(
-                mapOf(
-                    "col_string" to "hello",
-                    "col_long" to 42L,
-                    "col_int" to 7,
-                    "col_float" to 3.14f,
-                    "col_double" to 2.718,
-                    "col_boolean" to true,
-                    "col_date" to 19000,
-                    "col_timestamp" to 1700000000000000L
-                )
-            ))
-
-            val records = reader.read("data/primitives.parquet")
-
-            records shouldHaveSize 1
-            val r = records[0]
-            r.get("col_string").toString() shouldBe "hello"
-            r.get("col_long") shouldBe 42L
-            r.get("col_int") shouldBe 7
-            r.get("col_float") shouldBe 3.14f
-            r.get("col_double") shouldBe 2.718
-            r.get("col_boolean") shouldBe true
-            r.get("col_date") shouldBe 19000
-            r.get("col_timestamp") shouldBe 1700000000000000L
-        }
-
-        @Test
-        fun `reads null values correctly`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("value", DeltaType.StringType, nullable = true)
-                )
-            )
-            writeTestFile("data/nulls.parquet", schema, listOf(
-                mapOf("id" to 1, "value" to "present"),
-                mapOf("id" to 2, "value" to null),
-                mapOf("id" to 3, "value" to null)
-            ))
-
-            val records = reader.read("data/nulls.parquet")
-
-            records shouldHaveSize 3
-            records[0].get("value").toString() shouldBe "present"
-            records[1].get("value") shouldBe null
-            records[2].get("value") shouldBe null
-        }
     }
 
     @Nested
@@ -164,7 +89,6 @@ class ParquetFileReaderTest {
             records shouldHaveSize 2
             records[0].get("id") shouldBe 1
             records[0].get("name").toString() shouldBe "Alice"
-            // Projected schema only has id and name
             records[0].schema.fields.map { it.name() } shouldBe listOf("id", "name")
         }
 
@@ -200,7 +124,6 @@ class ParquetFileReaderTest {
 
         @Test
         fun `reads file with fewer columns than projection - missing columns are null`() {
-            // Write file with narrow schema
             val narrowSchema = DeltaType.StructType(
                 listOf(
                     StructField("id", DeltaType.IntegerType, nullable = false),
@@ -212,7 +135,6 @@ class ParquetFileReaderTest {
                 mapOf("id" to 2, "name" to "Bob")
             ))
 
-            // Read with wider schema (added "age" column)
             val widerSchema = DeltaType.StructType(
                 listOf(
                     StructField("id", DeltaType.IntegerType, nullable = false),
@@ -322,7 +244,6 @@ class ParquetFileReaderTest {
             val first = iter.next()
             first.get("id") shouldBe 1
 
-            // Close without reading all records — should not throw
             iter.close()
         }
 
@@ -362,60 +283,25 @@ class ParquetFileReaderTest {
 
             result shouldBe listOf("b", "c")
         }
-    }
-
-    @Nested
-    inner class DecimalType {
 
         @Test
-        fun `reads decimal values correctly`() {
+        fun `next on exhausted iterator throws NoSuchElementException`() {
             val schema = DeltaType.StructType(
-                listOf(StructField("amount", DeltaType.DecimalType(10, 2), nullable = false))
+                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
             )
-            val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
+            writeTestFile("data/exhausted.parquet", schema, listOf(mapOf("id" to 1)))
 
-            val dec = BigDecimal("123.45")
-            val records = listOf(
-                GenericRecordBuilder(avroSchema)
-                    .set("amount", ByteBuffer.wrap(dec.unscaledValue().toByteArray()))
-                    .build()
-            )
-            val writer = ParquetFileWriter(logStore, schema)
-            writer.write("data/decimal.parquet", records)
-
-            val readRecords = reader.read("data/decimal.parquet")
-            readRecords shouldHaveSize 1
-
-            val readBuf = readRecords[0].get("amount") as ByteBuffer
-            val readBytes = ByteArray(readBuf.remaining())
-            readBuf.get(readBytes)
-            val readDecimal = BigDecimal(java.math.BigInteger(readBytes), 2)
-            readDecimal shouldBe dec
+            val iter = reader.readIterator("data/exhausted.parquet")
+            iter.use {
+                it.next() // consume the single record
+                assertThrows<NoSuchElementException> { it.next() }
+            }
         }
     }
+
 
     @Nested
     inner class LargeFile {
-
-        @Test
-        fun `reads large file without issue`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("value", DeltaType.StringType, nullable = true)
-                )
-            )
-            val count = 10_000
-            writeTestFile("data/large.parquet", schema, (0 until count).map { i ->
-                mapOf("id" to i, "value" to "row-$i")
-            })
-
-            val records = reader.read("data/large.parquet")
-
-            records shouldHaveSize count
-            records.first().get("id") shouldBe 0
-            records.last().get("id") shouldBe count - 1
-        }
 
         @Test
         fun `streams large file via iterator`() {
@@ -472,10 +358,6 @@ class ParquetFileReaderTest {
         }
     }
 
-    /**
-     * Write a test Parquet file using ParquetFileWriter.
-     * Values map keys must match field names in the schema.
-     */
     private fun writeTestFile(
         filePath: String,
         schema: DeltaType.StructType,

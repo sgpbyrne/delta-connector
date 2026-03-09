@@ -46,8 +46,10 @@ micrometer-otlp = { module = "io.micrometer:micrometer-registry-otlp", version.r
 # Test
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+testcontainers-core = { module = "org.testcontainers:testcontainers" }
 testcontainers-kafka = { module = "org.testcontainers:kafka" }
 testcontainers-mssql = { module = "org.testcontainers:mssqlserver" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 

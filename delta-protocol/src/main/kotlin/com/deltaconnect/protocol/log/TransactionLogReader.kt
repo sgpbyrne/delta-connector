@@ -40,7 +40,6 @@ class TransactionLogReader(private val logStore: DeltaLogStore) {
     fun getSnapshot(tablePath: String): DeltaSnapshot {
         val state = SnapshotState()
 
-        // Load base state from checkpoint if available
         val checkpointInfo = readCheckpointInfo(tablePath)
         val startVersion = if (checkpointInfo != null) {
             try {
@@ -65,7 +64,6 @@ class TransactionLogReader(private val logStore: DeltaLogStore) {
             0L
         }
 
-        // Replay JSON commits from startVersion onwards
         val versions = logStore.listCommitVersions(tablePath, startVersion)
 
         if (versions.isEmpty() && state.latestVersion < 0) {
@@ -122,7 +120,6 @@ class TransactionLogReader(private val logStore: DeltaLogStore) {
         }
     }
 
-    /** Mutable accumulator for snapshot reconstruction, providing a single action dispatch method. */
     private class SnapshotState {
         val activeFiles = mutableMapOf<String, AddFile>()
         var metaData: MetaData? = null

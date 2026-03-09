@@ -137,13 +137,6 @@ class DeltaTransaction internal constructor(
         }
     }
 
-    /**
-     * Check if any intermediate commits (between fromVersion and toVersion)
-     * touched any of the file paths in [ourRemovePaths].
-     *
-     * A conflict exists if an intermediate commit added or removed a file
-     * that this transaction is also trying to remove.
-     */
     private fun hasConflictingPaths(
         fromVersion: Long,
         toVersion: Long,
@@ -173,11 +166,6 @@ class DeltaTransaction internal constructor(
         return false
     }
 
-    /**
-     * Write a checkpoint if the committed version is a multiple of the checkpoint interval.
-     *
-     * This is best-effort: checkpoint failure does not invalidate the commit.
-     */
     private fun tryWriteCheckpoint(committedVersion: Long) {
         if (committedVersion <= 0 ||
             committedVersion % CheckpointWriter.DEFAULT_CHECKPOINT_INTERVAL != 0L

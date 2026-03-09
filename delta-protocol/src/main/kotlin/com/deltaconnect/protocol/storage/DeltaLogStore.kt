@@ -1,6 +1,6 @@
 package com.deltaconnect.protocol.storage
 
-import java.io.InputStream
+import org.apache.parquet.io.InputFile
 import java.io.OutputStream
 
 /**
@@ -10,9 +10,6 @@ import java.io.OutputStream
  * Implementations must provide atomic commit semantics for [writeCommit].
  * If the version file already exists, [CommitConflictException] must be thrown.
  *
- * Implementations:
- * - [LocalFileSystemLogStore] for testing (uses local filesystem)
- * - AdlsGen2LogStore (in delta-azure module) for production
  */
 interface DeltaLogStore {
 
@@ -46,11 +43,16 @@ interface DeltaLogStore {
     fun createDataFile(filePath: String): OutputStream
 
     /**
-     * Read a data file and return an input stream.
+     * Read a data file and return a seekable Parquet [InputFile].
+     *
+     * Provides seekable access that the Parquet format requires. Implementations
+     * should use the most efficient seekable mechanism available (e.g.
+     * [java.io.RandomAccessFile] for local FS, HTTP range reads for cloud storage).
      *
      * @param filePath Full path to the data file.
+     * @return A seekable [InputFile] for Parquet reading.
      */
-    fun readDataFile(filePath: String): InputStream
+    fun readDataFileAsInputFile(filePath: String): InputFile
 
     /**
      * Read the `_last_checkpoint` file for the given table.

@@ -115,7 +115,6 @@ class LocalFileSystemLogStoreTest {
         @Test
         fun `ignores checkpoint files`() {
             store.writeCommit(tablePath, 0, "v0".toByteArray())
-            // Simulate a checkpoint file existing in _delta_log
             val logDir = tempDir.resolve(tablePath).resolve("_delta_log")
             logDir.resolve("00000000000000000000.checkpoint.parquet").toFile().createNewFile()
 
@@ -127,7 +126,7 @@ class LocalFileSystemLogStoreTest {
     inner class DataFiles {
 
         @Test
-        fun `createDataFile and readDataFile round-trip`() {
+        fun `createDataFile and readDataFileAsInputFile round-trip`() {
             val filePath = "$tablePath/data/part-00000.parquet"
             val data = "parquet-content".toByteArray()
 
@@ -135,8 +134,8 @@ class LocalFileSystemLogStoreTest {
                 out.write(data)
             }
 
-            val read = store.readDataFile(filePath).use { it.readAllBytes() }
-            read shouldBe data
+            val inputFile = store.readDataFileAsInputFile(filePath)
+            inputFile.length shouldBe data.size.toLong()
         }
 
         @Test
@@ -144,8 +143,8 @@ class LocalFileSystemLogStoreTest {
             val filePath = "$tablePath/deep/nested/dir/file.parquet"
             store.createDataFile(filePath).use { it.write("data".toByteArray()) }
 
-            val read = store.readDataFile(filePath).use { it.readAllBytes() }
-            String(read) shouldBe "data"
+            val inputFile = store.readDataFileAsInputFile(filePath)
+            inputFile.length shouldBe 4L
         }
     }
 

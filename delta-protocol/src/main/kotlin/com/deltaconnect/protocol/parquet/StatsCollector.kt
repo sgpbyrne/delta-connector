@@ -52,10 +52,6 @@ class StatsCollector(schema: DeltaType.StructType) {
         }
     }
 
-    /**
-     * Resolve a potentially dot-separated path against a nested GenericRecord.
-     * e.g. "address.city" traverses record.get("address").get("city").
-     */
     private fun resolveNestedValue(record: GenericRecord, path: String): Any? {
         val parts = path.split('.')
         var current: Any? = record
@@ -101,9 +97,6 @@ class StatsCollector(schema: DeltaType.StructType) {
         return objectMapper.writeValueAsString(stats)
     }
 
-    /**
-     * Format nested . syntax to nested map structure
-     */
     @Suppress("UNCHECKED_CAST")
     private fun setNestedValue(root: MutableMap<String, Any>, path: String, value: Any) {
         val parts = path.split('.')
@@ -172,10 +165,12 @@ internal class ColumnStats(
         @Suppress("UNCHECKED_CAST")
         val comparable = toComparable(value) ?: return
 
-        if (minValue == null || comparable < minValue!!) {
+        val currentMin = minValue
+        if (currentMin == null || comparable < currentMin) {
             minValue = comparable
         }
-        if (maxValue == null || comparable > maxValue!!) {
+        val currentMax = maxValue
+        if (currentMax == null || comparable > currentMax) {
             maxValue = comparable
         }
     }
@@ -255,14 +250,6 @@ internal class ColumnStats(
         }
     }
 
-    /**
-     * Increment the last character of a truncated string to create a valid
-     * upper bound for file pruning. If the last char is [Char.MAX_VALUE],
-     * trim it and try incrementing the preceding character. Returns null if
-     * all characters are [Char.MAX_VALUE] (no representable upper bound).
-     *
-     * This matches the behaviour of Spark's Delta writer.
-     */
     private fun incrementTruncatedMax(truncated: String): String? {
         val chars = truncated.toCharArray()
         var i = chars.size - 1

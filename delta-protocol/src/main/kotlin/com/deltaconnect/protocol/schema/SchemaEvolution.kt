@@ -27,7 +27,6 @@ object SchemaEvolution {
         val mergedFields = mutableListOf<StructField>()
         var changed = false
 
-        // Process existing fields, checking for type changes
         for (field in existing.fields) {
             val incomingField = incomingByName[field.name]
             if (incomingField == null) {
@@ -38,7 +37,7 @@ object SchemaEvolution {
             val widened = widenType(field.type, incomingField.type)
                 ?: return MergeResult.Incompatible(
                     "Incompatible type change for column '${field.name}': " +
-                        "${typeName(field.type)} → ${typeName(incomingField.type)}"
+                        "${field.type.typeName} → ${incomingField.type.typeName}"
                 )
 
             val mergedNullable = field.nullable || incomingField.nullable
@@ -47,7 +46,6 @@ object SchemaEvolution {
             mergedFields.add(mergedField)
         }
 
-        // Add new columns from incoming (must be nullable)
         for (field in incoming.fields) {
             if (field.name !in existingByName) {
                 if (!field.nullable) {
@@ -64,10 +62,6 @@ object SchemaEvolution {
         return if (changed) MergeResult.Evolved(result) else MergeResult.NoChange(result)
     }
 
-    /**
-     * Try to widen [from] type to [to] type. Returns the widened type,
-     * or null if the types are incompatible.
-     */
     private fun widenType(from: DeltaType, to: DeltaType): DeltaType? {
         if (from == to) return from
 
@@ -92,22 +86,4 @@ object SchemaEvolution {
     private val SHORT_WIDENABLE = setOf(
         DeltaType.IntegerType, DeltaType.LongType
     )
-
-    private fun typeName(type: DeltaType): String = when (type) {
-        is DeltaType.StringType -> "string"
-        is DeltaType.LongType -> "long"
-        is DeltaType.IntegerType -> "integer"
-        is DeltaType.ShortType -> "short"
-        is DeltaType.ByteType -> "byte"
-        is DeltaType.FloatType -> "float"
-        is DeltaType.DoubleType -> "double"
-        is DeltaType.BooleanType -> "boolean"
-        is DeltaType.BinaryType -> "binary"
-        is DeltaType.DateType -> "date"
-        is DeltaType.TimestampType -> "timestamp"
-        is DeltaType.DecimalType -> "decimal(${type.precision},${type.scale})"
-        is DeltaType.ArrayType -> "array"
-        is DeltaType.MapType -> "map"
-        is DeltaType.StructType -> "struct"
-    }
 }

@@ -211,9 +211,6 @@ class DeltaMergeEngine(
         return result
     }
 
-    /**
-     * Build the source index with last writer wins deduplication.
-     */
     private fun buildSourceIndex(
         sourceRecords: List<SourceRecord>
     ): Map<MergeKey, IndexedSourceRecord> {
@@ -232,9 +229,6 @@ class DeltaMergeEngine(
         return index
     }
 
-    /**
-     * Extract min/max bounds for each merge key column from the source index.
-     */
     @Suppress("UNCHECKED_CAST")
     private fun extractKeyBounds(
         sourceIndex: Map<MergeKey, IndexedSourceRecord>

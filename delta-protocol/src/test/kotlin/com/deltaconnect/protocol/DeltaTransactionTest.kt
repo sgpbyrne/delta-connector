@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
-import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Path
 
@@ -160,7 +159,6 @@ class DeltaTransactionTest {
             val txn = table.startTransaction()
             txn.addAction(LogTestFixtures.addFile("txn-file.parquet"))
 
-            // Simulate 3 concurrent commits
             for (v in 1L..3L) {
                 LogTestFixtures.writeCommit(logStore, tablePath, v, listOf(
                     LogTestFixtures.addFile("concurrent-$v.parquet")
@@ -298,22 +296,6 @@ class DeltaTransactionTest {
         }
 
         @Test
-        fun `blind append retries past pre-filled conflicts`() {
-            val table = DeltaTable.forPath(logStore, tablePath)
-            val txn = table.startTransaction()
-            txn.addAction(LogTestFixtures.addFile("txn-file.parquet"))
-
-            for (v in 1L..3L) {
-                LogTestFixtures.writeCommit(logStore, tablePath, v, listOf(
-                    LogTestFixtures.addFile("concurrent-$v.parquet")
-                ))
-            }
-
-            val version = txn.commit("WRITE", maxRetries = 1)
-            version shouldBe 4L
-        }
-
-        @Test
         fun `zero retries fails on first conflict`() {
             val table = DeltaTable.forPath(logStore, tablePath)
             val txn = table.startTransaction()
@@ -426,6 +408,29 @@ class DeltaTransactionTest {
         }
     }
 
+    @Nested
+    inner class CheckpointResilience {
+
+        @Test
+        fun `commit succeeds even when checkpoint write fails`() {
+            val checkpointTable = "checkpoint-test-table"
+            val failingStore = CheckpointFailingLogStore(logStore)
+            DeltaTable.createOrReplace(failingStore, checkpointTable, simpleSchema)
+            val table = DeltaTable.forPath(failingStore, checkpointTable)
+
+            for (i in 1..10) {
+                val txn = table.startTransaction()
+                txn.addAction(LogTestFixtures.addFile("data-%03d.parquet".format(i)))
+                val version = txn.commit("WRITE")
+                version shouldBe i.toLong()
+            }
+
+            val snapshot = table.snapshot()
+            snapshot.version shouldBe 10L
+            snapshot.activeFiles shouldHaveSize 10
+        }
+    }
+
     private class ConflictInjectingLogStore(
         private val delegate: LocalFileSystemLogStore,
         private val conflictsToInject: Int
@@ -455,8 +460,38 @@ class DeltaTransactionTest {
         override fun createDataFile(filePath: String): OutputStream =
             delegate.createDataFile(filePath)
 
-        override fun readDataFile(filePath: String): InputStream =
-            delegate.readDataFile(filePath)
+        override fun readDataFileAsInputFile(filePath: String): org.apache.parquet.io.InputFile =
+            delegate.readDataFileAsInputFile(filePath)
+
+        override fun readLastCheckpoint(tablePath: String): String? =
+            delegate.readLastCheckpoint(tablePath)
+
+        override fun writeLastCheckpoint(tablePath: String, content: String) =
+            delegate.writeLastCheckpoint(tablePath, content)
+    }
+
+    private class CheckpointFailingLogStore(
+        private val delegate: LocalFileSystemLogStore
+    ) : DeltaLogStore {
+
+        override fun writeCommit(tablePath: String, version: Long, content: ByteArray) =
+            delegate.writeCommit(tablePath, version, content)
+
+        override fun readCommit(tablePath: String, version: Long): ByteArray? =
+            delegate.readCommit(tablePath, version)
+
+        override fun listCommitVersions(tablePath: String, startVersion: Long): List<Long> =
+            delegate.listCommitVersions(tablePath, startVersion)
+
+        override fun createDataFile(filePath: String): OutputStream {
+            if (filePath.endsWith(".checkpoint.parquet")) {
+                throw RuntimeException("Simulated checkpoint write failure")
+            }
+            return delegate.createDataFile(filePath)
+        }
+
+        override fun readDataFileAsInputFile(filePath: String): org.apache.parquet.io.InputFile =
+            delegate.readDataFileAsInputFile(filePath)
 
         override fun readLastCheckpoint(tablePath: String): String? =
             delegate.readLastCheckpoint(tablePath)

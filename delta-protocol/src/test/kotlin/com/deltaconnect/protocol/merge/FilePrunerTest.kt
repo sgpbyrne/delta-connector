@@ -195,7 +195,6 @@ class FilePrunerTest {
 
         @Test
         fun `prunes when any key column has no overlap`() {
-            // tenant_id overlaps but id does not
             val stats = """{"numRecords":10,""" +
                 """"minValues":{"tenant_id":"A","id":1},""" +
                 """"maxValues":{"tenant_id":"C","id":10},""" +
@@ -297,6 +296,57 @@ class FilePrunerTest {
                     BigDecimal("200.00") as Comparable<*>
                 )
             )
+
+            val result = pruner.prune(setOf(file), bounds)
+
+            result.prunedCount shouldBe 1
+        }
+
+        @Test
+        fun `prunes correctly for float keys`() {
+            pruner = FilePruner(
+                listOf(StructField("score", DeltaType.FloatType, nullable = false))
+            )
+            val stats = """{"numRecords":10,""" +
+                """"minValues":{"score":1.0},""" +
+                """"maxValues":{"score":5.0},""" +
+                """"nullCount":{"score":0}}"""
+            val file = addFile("f1.parquet", stats = stats)
+            val bounds = mapOf("score" to KeyBounds(10.0f, 20.0f))
+
+            val result = pruner.prune(setOf(file), bounds)
+
+            result.prunedCount shouldBe 1
+        }
+
+        @Test
+        fun `prunes correctly for double keys`() {
+            pruner = FilePruner(
+                listOf(StructField("amount", DeltaType.DoubleType, nullable = false))
+            )
+            val stats = """{"numRecords":10,""" +
+                """"minValues":{"amount":100.5},""" +
+                """"maxValues":{"amount":200.5},""" +
+                """"nullCount":{"amount":0}}"""
+            val file = addFile("f1.parquet", stats = stats)
+            val bounds = mapOf("amount" to KeyBounds(300.0, 400.0))
+
+            val result = pruner.prune(setOf(file), bounds)
+
+            result.prunedCount shouldBe 1
+        }
+
+        @Test
+        fun `prunes correctly for boolean keys`() {
+            pruner = FilePruner(
+                listOf(StructField("active", DeltaType.BooleanType, nullable = false))
+            )
+            val stats = """{"numRecords":10,""" +
+                """"minValues":{"active":false},""" +
+                """"maxValues":{"active":false},""" +
+                """"nullCount":{"active":0}}"""
+            val file = addFile("f1.parquet", stats = stats)
+            val bounds = mapOf("active" to KeyBounds(true, true))
 
             val result = pruner.prune(setOf(file), bounds)
 

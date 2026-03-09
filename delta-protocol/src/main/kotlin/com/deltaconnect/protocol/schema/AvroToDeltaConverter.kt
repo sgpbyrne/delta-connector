@@ -19,7 +19,8 @@ object AvroToDeltaConverter {
             } else {
                 avroType
             }
-            AvroSchema.Field(field.name, fieldSchema, null, if (field.nullable) AvroSchema.Field.NULL_DEFAULT_VALUE else null)
+            val defaultValue = if (field.nullable) AvroSchema.Field.NULL_DEFAULT_VALUE else null
+            AvroSchema.Field(field.name, fieldSchema, null, defaultValue)
         }
         return AvroSchema.createRecord(recordName, null, "com.deltaconnect", false, fields)
     }
@@ -50,7 +51,8 @@ object AvroToDeltaConverter {
             is DeltaType.BooleanType -> AvroSchema.create(AvroSchema.Type.BOOLEAN)
             is DeltaType.BinaryType -> AvroSchema.create(AvroSchema.Type.BYTES)
             is DeltaType.DateType -> LogicalTypes.date().addToSchema(AvroSchema.create(AvroSchema.Type.INT))
-            is DeltaType.TimestampType -> LogicalTypes.timestampMicros().addToSchema(AvroSchema.create(AvroSchema.Type.LONG))
+            is DeltaType.TimestampType ->
+                LogicalTypes.timestampMicros().addToSchema(AvroSchema.create(AvroSchema.Type.LONG))
             is DeltaType.DecimalType -> {
                 val bytesSchema = AvroSchema.create(AvroSchema.Type.BYTES)
                 LogicalTypes.decimal(type.precision, type.scale).addToSchema(bytesSchema)
@@ -78,10 +80,6 @@ object AvroToDeltaConverter {
         }
     }
 
-    /**
-     * Returns the Delta type and nullability from an Avro field schema.
-     * Handles union types: `["null", T]` means nullable T.
-     */
     private fun avroFieldToDelta(schema: AvroSchema): Pair<DeltaType, Boolean> {
         if (schema.type == AvroSchema.Type.UNION) {
             val nonNullTypes = schema.types.filter { it.type != AvroSchema.Type.NULL }

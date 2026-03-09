@@ -1,9 +1,7 @@
 package com.deltaconnect.protocol.storage
 
 import com.deltaconnect.protocol.actions.ActionSerializer
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.InputStream
+import org.apache.parquet.io.InputFile
 import java.io.OutputStream
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
@@ -58,9 +56,9 @@ class LocalFileSystemLogStore(private val baseDir: Path) : DeltaLogStore {
         return Files.newOutputStream(path, StandardOpenOption.CREATE_NEW)
     }
 
-    override fun readDataFile(filePath: String): InputStream {
+    override fun readDataFileAsInputFile(filePath: String): InputFile {
         val path = baseDir.resolve(filePath)
-        return Files.newInputStream(path)
+        return LocalRandomAccessInputFile(path)
     }
 
     override fun readLastCheckpoint(tablePath: String): String? {

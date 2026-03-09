@@ -4,6 +4,7 @@ import com.deltaconnect.protocol.DeltaSnapshot
 import com.deltaconnect.protocol.storage.LocalFileSystemLogStore
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.maps.shouldBeEmpty as shouldBeEmptyMap
 import io.kotest.matchers.maps.shouldHaveSize as shouldHaveMapSize
 import io.kotest.matchers.nulls.shouldBeNull
@@ -99,6 +100,26 @@ class TransactionLogReaderTest {
         }
 
         @Test
+        fun `handles missing mid-sequence commit gracefully`() {
+            LogTestFixtures.writeInitialCommit(logStore, tablePath, listOf(
+                LogTestFixtures.addFile("data-001.parquet")
+            ))
+            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
+                LogTestFixtures.addFile("data-002.parquet")
+            ))
+            LogTestFixtures.writeCommit(logStore, tablePath, 3L, listOf(
+                LogTestFixtures.addFile("data-004.parquet")
+            ))
+
+            val snapshot = reader.getSnapshot(tablePath)
+
+            snapshot.version shouldBe 3L
+            snapshot.activeFiles shouldHaveSize 3
+            val paths = snapshot.activeFiles.map { it.path }.toSet()
+            paths shouldBe setOf("data-001.parquet", "data-002.parquet", "data-004.parquet")
+        }
+
+        @Test
         fun `getLatestVersion returns highest version`() {
             LogTestFixtures.writeInitialCommit(logStore, tablePath)
             LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
@@ -141,7 +162,7 @@ class TransactionLogReaderTest {
 
             val snapshot = reader.getSnapshot(tablePath)
 
-            snapshot.activeFiles.none { it.path == "ephemeral.parquet" } shouldBe true
+            snapshot.activeFiles.map { it.path } shouldNotContain "ephemeral.parquet"
         }
 
         @Test
