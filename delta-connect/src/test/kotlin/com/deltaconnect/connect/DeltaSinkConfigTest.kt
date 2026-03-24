@@ -218,10 +218,11 @@ class DeltaSinkConfigTest {
             }
             val errors = DeltaSinkConfig.validateCrossProperties(props)
             errors.any { it.contains(DeltaSinkConfig.UNITY_CATALOG_WORKSPACE_URL) } shouldBe true
+            errors.any { it.contains(DeltaSinkConfig.UNITY_CATALOG_TOKEN) } shouldBe true
             errors.any { it.contains(DeltaSinkConfig.UNITY_CATALOG_NAME) } shouldBe true
             errors.any { it.contains(DeltaSinkConfig.UNITY_CATALOG_SCHEMA) } shouldBe true
             errors.any { it.contains(DeltaSinkConfig.UNITY_CATALOG_WAREHOUSE_ID) } shouldBe true
-            errors shouldHaveSize 4
+            errors shouldHaveSize 5
         }
 
         @Test

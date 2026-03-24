@@ -36,6 +36,7 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
 
     val unityCatalogEnabled: Boolean get() = getBoolean(UNITY_CATALOG_ENABLED)
     val unityCatalogWorkspaceUrl: String get() = getString(UNITY_CATALOG_WORKSPACE_URL)
+    val unityCatalogToken: String get() = getPassword(UNITY_CATALOG_TOKEN)?.value() ?: ""
     val unityCatalogName: String get() = getString(UNITY_CATALOG_NAME)
     val unityCatalogSchema: String get() = getString(UNITY_CATALOG_SCHEMA)
     val unityCatalogWarehouseId: String get() = getString(UNITY_CATALOG_WAREHOUSE_ID)
@@ -152,6 +153,11 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
             "Databricks workspace URL (e.g. https://adb-xxxx.azuredatabricks.net). " +
                 "Auth uses cloud credentials (DefaultAzureCredential / workload identity)."
 
+        const val UNITY_CATALOG_TOKEN = "unity.catalog.token"
+        private const val UNITY_CATALOG_TOKEN_DOC =
+            "Databricks personal access token (PAT) for Unity Catalog authentication. " +
+                "For production, use workload identity or managed credentials instead."
+
         const val UNITY_CATALOG_NAME = "unity.catalog.name"
         private const val UNITY_CATALOG_NAME_DOC =
             "Unity Catalog name to register tables in."
@@ -250,26 +256,31 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
                     UNITY_CATALOG_GROUP, 2, Width.LONG, "Workspace URL"
                 )
                 .define(
+                    UNITY_CATALOG_TOKEN, Type.PASSWORD, "",
+                    Importance.MEDIUM, UNITY_CATALOG_TOKEN_DOC,
+                    UNITY_CATALOG_GROUP, 3, Width.LONG, "Token"
+                )
+                .define(
                     UNITY_CATALOG_NAME, Type.STRING, "",
                     Importance.MEDIUM, UNITY_CATALOG_NAME_DOC,
-                    UNITY_CATALOG_GROUP, 3, Width.LONG, "Catalog Name"
+                    UNITY_CATALOG_GROUP, 4, Width.LONG, "Catalog Name"
                 )
                 .define(
                     UNITY_CATALOG_SCHEMA, Type.STRING, "",
                     Importance.MEDIUM, UNITY_CATALOG_SCHEMA_DOC,
-                    UNITY_CATALOG_GROUP, 4, Width.LONG, "Schema Name"
+                    UNITY_CATALOG_GROUP, 5, Width.LONG, "Schema Name"
                 )
                 .define(
                     UNITY_CATALOG_WAREHOUSE_ID, Type.STRING, "",
                     Importance.MEDIUM, UNITY_CATALOG_WAREHOUSE_ID_DOC,
-                    UNITY_CATALOG_GROUP, 5, Width.LONG, "Warehouse ID"
+                    UNITY_CATALOG_GROUP, 6, Width.LONG, "Warehouse ID"
                 )
                 .define(
                     UNITY_CATALOG_SYNC_INTERVAL_MS, Type.LONG,
                     UNITY_CATALOG_SYNC_INTERVAL_MS_DEFAULT,
                     ConfigDef.Range.atLeast(10_000),
                     Importance.LOW, UNITY_CATALOG_SYNC_INTERVAL_MS_DOC,
-                    UNITY_CATALOG_GROUP, 6, Width.SHORT, "Sync Interval (ms)"
+                    UNITY_CATALOG_GROUP, 7, Width.SHORT, "Sync Interval (ms)"
                 )
 
             // Add storage provider config keys (discovered via ServiceLoader)
@@ -327,6 +338,12 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
                 if (config.unityCatalogWarehouseId.isBlank()) {
                     errors.add(
                         "$UNITY_CATALOG_WAREHOUSE_ID is required " +
+                            "when $UNITY_CATALOG_ENABLED=true"
+                    )
+                }
+                if (config.unityCatalogToken.isBlank()) {
+                    errors.add(
+                        "$UNITY_CATALOG_TOKEN is required " +
                             "when $UNITY_CATALOG_ENABLED=true"
                     )
                 }

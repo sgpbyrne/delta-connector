@@ -1,5 +1,7 @@
 package com.deltaconnect.connect
 
+import com.deltaconnect.catalog.DatabricksSqlClient
+import com.deltaconnect.catalog.UnityCatalogSync
 import com.deltaconnect.connect.cdc.DebeziumRecordConverter
 import com.deltaconnect.connect.storage.StorageProviderRegistry
 import com.deltaconnect.protocol.storage.CommitConflictException
@@ -45,8 +47,10 @@ class DeltaSinkTask : SinkTask() {
     private lateinit var converter: RecordConverter
     private lateinit var basePath: String
     private var reporter: ErrantRecordReporter? = null
+    private var catalogSync: UnityCatalogSync? = null
 
     private val tableWriters = mutableMapOf<String, TableWriter>()
+    private val tablePaths = mutableMapOf<String, String>()  // topic → tablePath
     private val committedOffsets = mutableMapOf<TopicPartition, Long>()
     private var lastFlushTimeMs: Long = 0L
 
@@ -83,11 +87,29 @@ class DeltaSinkTask : SinkTask() {
             null
         }
 
+        // Unity Catalog sync (optional)
+        if (config.unityCatalogEnabled) {
+            val client = DatabricksSqlClient(
+                workspaceUrl = config.unityCatalogWorkspaceUrl,
+                warehouseId = config.unityCatalogWarehouseId,
+                tokenSupplier = { config.unityCatalogToken }
+            )
+            catalogSync = UnityCatalogSync(
+                client = client,
+                catalog = config.unityCatalogName,
+                schema = config.unityCatalogSchema,
+                syncIntervalMs = config.unityCatalogSyncIntervalMs,
+                clock = clock
+            )
+            log.info("Unity Catalog sync enabled: catalog={}, schema={}",
+                config.unityCatalogName, config.unityCatalogSchema)
+        }
+
         log.info(
             "DeltaSinkTask started: writeMode={}, batchSize={}, intervalMs={}, " +
-                "schemaEvolution={}, dlqEnabled={}",
+                "schemaEvolution={}, dlqEnabled={}, unityCatalog={}",
             config.writeMode, config.mergeBatchSize, config.mergeIntervalMs,
-            config.schemaEvolutionEnabled, reporter != null
+            config.schemaEvolutionEnabled, reporter != null, config.unityCatalogEnabled
         )
     }
 
@@ -128,9 +150,9 @@ class DeltaSinkTask : SinkTask() {
         }
 
         // Check batch size trigger per topic
-        for ((_, writer) in tableWriters) {
+        for ((topic, writer) in tableWriters) {
             if (writer.bufferSize() >= config.mergeBatchSize) {
-                flushWriter(writer)
+                flushWriter(topic, writer)
             }
         }
 
@@ -159,7 +181,7 @@ class DeltaSinkTask : SinkTask() {
         for (topic in topicsToFlush) {
             val writer = tableWriters[topic]
             if (writer != null && writer.hasBufferedRecords()) {
-                flushWriter(writer)
+                flushWriter(topic, writer)
             }
         }
 
@@ -172,6 +194,7 @@ class DeltaSinkTask : SinkTask() {
         log.info("Stopping DeltaSinkTask")
         flushAll()
         tableWriters.clear()
+        tablePaths.clear()
         committedOffsets.clear()
     }
 
@@ -208,6 +231,7 @@ class DeltaSinkTask : SinkTask() {
         return tableWriters.getOrPut(topic) {
             val tableName = DeltaSinkConfig.resolveTableName(config.tableName, topic)
             val tablePath = if (basePath.isEmpty()) tableName else "$basePath/$tableName"
+            tablePaths[topic] = tablePath
             log.info("Creating TableWriter: topic={}, tablePath={}", topic, tablePath)
             TableWriter(
                 logStore = logStore,
@@ -219,27 +243,34 @@ class DeltaSinkTask : SinkTask() {
         }
     }
 
-    private fun flushWriter(writer: TableWriter) {
+    private fun flushWriter(topic: String, writer: TableWriter) {
         try {
             val flushedOffsets = writer.flush()
             committedOffsets.putAll(flushedOffsets)
             lastFlushTimeMs = clock()
+
+            val sync = catalogSync
+            if (sync != null) {
+                val path = tablePaths[topic]
+                if (path != null) {
+                    val tableName = DeltaSinkConfig.resolveTableName(config.tableName, topic)
+                    val location = "${config.storagePath.trimEnd('/')}/$tableName"
+                    sync.onTableFlush(tableName, location)
+                }
+            }
         } catch (e: CommitConflictException) {
-            // Retries exhausted in DeltaTransaction - ask Connect to retry the task
             throw RetriableException("Delta commit conflict after retries: ${e.message}", e)
         } catch (e: ConnectException) {
-            // Schema incompatibility or other fatal errors - let Connect fail the task
             throw e
         } catch (e: java.io.IOException) {
-            // Storage I/O error - transient, ask Connect to retry
             throw RetriableException("Storage I/O error during flush: ${e.message}", e)
         }
     }
 
     private fun flushAll() {
-        for ((_, writer) in tableWriters) {
+        for ((topic, writer) in tableWriters) {
             if (writer.hasBufferedRecords()) {
-                flushWriter(writer)
+                flushWriter(topic, writer)
             }
         }
         lastFlushTimeMs = clock()

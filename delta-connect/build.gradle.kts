@@ -1,5 +1,6 @@
 dependencies {
     implementation(project(":delta-protocol"))
+    implementation(project(":delta-catalog"))
 
     compileOnly(libs.kafka.connect.api)
 
