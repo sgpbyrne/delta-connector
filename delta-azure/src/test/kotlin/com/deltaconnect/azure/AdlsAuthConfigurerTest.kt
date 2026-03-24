@@ -91,9 +91,9 @@ class AdlsAuthConfigurerTest {
         }
 
         @Test
-        fun `creates log store with default credential auth`() {
+        fun `creates log store with identity auth`() {
             val config = AdlsAuthConfig(
-                authType = AdlsAuthType.DEFAULT_CREDENTIAL,
+                authType = AdlsAuthType.IDENTITY,
                 accountName = "devstoreaccount1",
                 fileSystemName = "test"
             )

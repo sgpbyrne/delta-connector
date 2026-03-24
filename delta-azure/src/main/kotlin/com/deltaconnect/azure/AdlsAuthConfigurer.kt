@@ -13,8 +13,8 @@ enum class AdlsAuthType {
     STORAGE_KEY,
     /** Shared Access Signature token. */
     SAS_TOKEN,
-    /** Azure Identity DefaultAzureCredential. */
-    DEFAULT_CREDENTIAL
+    /** Azure Identity DefaultAzureCredential (managed identity, workload identity, service principal via env vars, etc.). */
+    IDENTITY
 }
 
 /**
@@ -68,7 +68,7 @@ object AdlsAuthConfigurer {
                 }
                 builder.sasToken(config.sasToken)
             }
-            AdlsAuthType.DEFAULT_CREDENTIAL -> {
+            AdlsAuthType.IDENTITY -> {
                 builder.credential(DefaultAzureCredentialBuilder().build())
             }
         }

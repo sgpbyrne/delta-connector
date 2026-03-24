@@ -119,7 +119,9 @@ class DeltaMergeEngine(
         val now = System.currentTimeMillis()
 
         for (file in pruneResult.matchingFiles) {
-            val fileMergeResult = reader.readIterator(file.path).use { iterator ->
+            // Read with schema projection so files written with an older schema
+            // get null-filled columns for any new fields added via schema evolution.
+            val fileMergeResult = reader.readIterator(file.path, schema).use { iterator ->
                 rowMerger.mergeFile(iterator, matchedKeys)
             }
 
