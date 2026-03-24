@@ -14,6 +14,7 @@ import org.apache.kafka.connect.sink.ErrantRecordReporter
 import org.apache.kafka.connect.sink.SinkRecord
 import org.apache.kafka.connect.sink.SinkTask
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 
 /**
  * Kafka Connect SinkTask that processes records and writes them
@@ -48,6 +49,8 @@ class DeltaSinkTask : SinkTask() {
     private lateinit var basePath: String
     private var reporter: ErrantRecordReporter? = null
     private var catalogSync: UnityCatalogSync? = null
+    private var metricsRegistry: CloseableMeterRegistry? = null
+    internal var metrics: ConnectorMetrics = ConnectorMetrics()
 
     private val tableWriters = mutableMapOf<String, TableWriter>()
     private val tablePaths = mutableMapOf<String, String>()  // topic → tablePath
@@ -86,6 +89,12 @@ class DeltaSinkTask : SinkTask() {
         } catch (_: NoClassDefFoundError) {
             null
         }
+
+        // Metrics: JMX always on, OTLP opt-in
+        metricsRegistry = MetricsRegistryFactory.create(
+            otlpEndpoint = config.metricsOtlpEndpoint.ifBlank { null }
+        )
+        metrics = ConnectorMetrics(metricsRegistry!!.registry)
 
         // Unity Catalog sync (optional)
         if (config.unityCatalogEnabled) {
@@ -142,11 +151,28 @@ class DeltaSinkTask : SinkTask() {
         val effectiveDeleteEnabled = config.mergeDeleteEnabled &&
             config.writeMode != DeltaSinkConfig.WriteMode.UPSERT
 
+        var convertedCount = 0L
         for (record in records) {
-            val sourceRecord = convertRecord(record, effectiveDeleteEnabled) ?: continue
-            val topic = record.topic()
-            val tp = TopicPartition(topic, record.kafkaPartition())
-            getOrCreateWriter(topic).buffer(sourceRecord, tp, record.kafkaOffset())
+            MDC.put("topic", record.topic())
+            MDC.put("partition", record.kafkaPartition().toString())
+            try {
+                val sourceRecord = convertRecord(record, effectiveDeleteEnabled) ?: continue
+                val topic = record.topic()
+                val tp = TopicPartition(topic, record.kafkaPartition())
+                getOrCreateWriter(topic).buffer(sourceRecord, tp, record.kafkaOffset())
+                convertedCount++
+            } finally {
+                MDC.remove("topic")
+                MDC.remove("partition")
+            }
+        }
+
+        // Record-level metrics by topic
+        records.groupBy { it.topic() }.forEach { (topic, topicRecords) ->
+            metrics.recordsReceived(topic, topicRecords.size.toLong())
+        }
+        if (convertedCount > 0) {
+            metrics.recordsConverted(records.first().topic(), convertedCount)
         }
 
         // Check batch size trigger per topic
@@ -196,6 +222,8 @@ class DeltaSinkTask : SinkTask() {
         tableWriters.clear()
         tablePaths.clear()
         committedOffsets.clear()
+        metricsRegistry?.close()
+        metricsRegistry = null
     }
 
     /**
@@ -210,6 +238,7 @@ class DeltaSinkTask : SinkTask() {
             converter.convert(record, deleteEnabled)
         } catch (e: Exception) {
             if (reporter != null) {
+                metrics.recordsDlq(record.topic())
                 log.warn(
                     "Record conversion failed, sending to DLQ: topic={}, partition={}, offset={}",
                     record.topic(), record.kafkaPartition(), record.kafkaOffset(), e
@@ -238,12 +267,16 @@ class DeltaSinkTask : SinkTask() {
                 tablePath = tablePath,
                 mergeKeys = config.mergeKeys,
                 writeMode = config.writeMode,
-                schemaEvolutionEnabled = config.schemaEvolutionEnabled
+                schemaEvolutionEnabled = config.schemaEvolutionEnabled,
+                topic = topic,
+                metrics = metrics
             )
         }
     }
 
     private fun flushWriter(topic: String, writer: TableWriter) {
+        MDC.put("topic", topic)
+        MDC.put("tablePath", tablePaths[topic] ?: "")
         try {
             val flushedOffsets = writer.flush()
             committedOffsets.putAll(flushedOffsets)
@@ -264,6 +297,9 @@ class DeltaSinkTask : SinkTask() {
             throw e
         } catch (e: java.io.IOException) {
             throw RetriableException("Storage I/O error during flush: ${e.message}", e)
+        } finally {
+            MDC.remove("topic")
+            MDC.remove("tablePath")
         }
     }
 

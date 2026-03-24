@@ -34,6 +34,10 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
         get() = CdcEnvelopeFormat.fromString(getString(CDC_ENVELOPE_FORMAT))
     val cdcSourceDatabase: String get() = getString(CDC_SOURCE_DATABASE)
 
+    // Metrics
+    val metricsOtlpEndpoint: String get() = getString(METRICS_OTLP_ENDPOINT)
+
+    // Unity Catalog
     val unityCatalogEnabled: Boolean get() = getBoolean(UNITY_CATALOG_ENABLED)
     val unityCatalogWorkspaceUrl: String get() = getString(UNITY_CATALOG_WORKSPACE_URL)
     val unityCatalogToken: String get() = getPassword(UNITY_CATALOG_TOKEN)?.value() ?: ""
@@ -125,6 +129,13 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
         private const val DELTA_CHECKPOINT_INTERVAL_DOC =
             "Number of Delta commits between automatic checkpoint writes."
         private const val DELTA_CHECKPOINT_INTERVAL_DEFAULT = 10
+
+        const val METRICS_OTLP_ENDPOINT = "delta.metrics.otlp.endpoint"
+        private const val METRICS_OTLP_ENDPOINT_DOC =
+            "OTLP endpoint URL for pushing metrics (e.g. http://collector:4318/v1/metrics). " +
+                "When set, metrics are pushed to the OTel collector in addition to JMX. " +
+                "Leave empty to use JMX only."
+        private const val METRICS_OTLP_ENDPOINT_DEFAULT = ""
 
         private const val CDC_GROUP = "CDC"
 
@@ -232,6 +243,11 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
                     ConfigDef.Range.atLeast(1),
                     Importance.LOW, DELTA_CHECKPOINT_INTERVAL_DOC,
                     DELTA_GROUP, 10, Width.SHORT, "Checkpoint Interval"
+                )
+                .define(
+                    METRICS_OTLP_ENDPOINT, Type.STRING, METRICS_OTLP_ENDPOINT_DEFAULT,
+                    Importance.LOW, METRICS_OTLP_ENDPOINT_DOC,
+                    DELTA_GROUP, 11, Width.LONG, "OTLP Metrics Endpoint"
                 )
                 .define(
                     CDC_ENVELOPE_FORMAT, Type.STRING, CDC_ENVELOPE_FORMAT_DEFAULT,

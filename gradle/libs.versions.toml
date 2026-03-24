@@ -41,6 +41,7 @@ azure-identity = { module = "com.azure:azure-identity", version.ref = "azure-ide
 
 # Observability
 micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
+micrometer-jmx = { module = "io.micrometer:micrometer-registry-jmx", version.ref = "micrometer" }
 micrometer-otlp = { module = "io.micrometer:micrometer-registry-otlp", version.ref = "micrometer" }
 
 # Test

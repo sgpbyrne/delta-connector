@@ -7,6 +7,9 @@ dependencies {
     implementation(libs.bundles.jackson)
     implementation(libs.bundles.parquet)
     implementation(libs.avro)
+    implementation(libs.micrometer.core)
+    implementation(libs.micrometer.jmx)
+    implementation(libs.micrometer.otlp)
 
     testImplementation(libs.kafka.connect.api)
     testImplementation(libs.hadoop.mapreduce.client.core) {

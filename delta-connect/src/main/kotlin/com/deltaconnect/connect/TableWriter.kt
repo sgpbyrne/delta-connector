@@ -41,7 +41,9 @@ class TableWriter(
     private val tablePath: String,
     private val mergeKeys: List<String>,
     private val writeMode: DeltaSinkConfig.WriteMode,
-    private val schemaEvolutionEnabled: Boolean = true
+    private val schemaEvolutionEnabled: Boolean = true,
+    private val topic: String = "",
+    private val metrics: ConnectorMetrics? = null
 ) {
 
     private var table: DeltaTable? = null
@@ -85,6 +87,9 @@ class TableWriter(
     fun flush(): Map<TopicPartition, Long> {
         if (buffer.isEmpty()) return emptyMap()
 
+        val flushStartMs = System.currentTimeMillis()
+        val recordCount = buffer.size.toLong()
+
         logger.info(
             "Flushing: table={}, records={}, partitions={}",
             tablePath, buffer.size, partitionOffsets.size
@@ -95,6 +100,9 @@ class TableWriter(
         val txn = table!!.startTransaction()
 
         val schemaEvolved = evolveSchemaIfNeeded(txn)
+        if (schemaEvolved) {
+            metrics?.schemaEvolutions(topic)
+        }
 
         val writeRecords = if (schemaEvolved) {
             val evolvedAvro = AvroToDeltaConverter.toAvroSchema(schema!!)
@@ -126,6 +134,12 @@ class TableWriter(
                 val mergeResult = mergeEngine!!.merge(snapshot, writeRecords)
                 txn.addActions(mergeResult.removeFiles)
                 txn.addActions(mergeResult.addFiles)
+
+                metrics?.mergeRecordsInserted(topic, mergeResult.recordsInserted)
+                metrics?.mergeRecordsUpdated(topic, mergeResult.recordsUpdated)
+                metrics?.mergeRecordsDeleted(topic, mergeResult.recordsDeleted)
+                metrics?.mergeFilesRewritten(topic, mergeResult.filesRewritten)
+                metrics?.mergeFilesSkipped(topic, mergeResult.filesSkipped)
             }
         }
 
@@ -154,6 +168,10 @@ class TableWriter(
             "Flush committed: table={}, version={}, records={}, operation={}",
             tablePath, committedVersion, buffer.size, operation
         )
+
+        metrics?.recordsFlushed(topic, recordCount)
+        metrics?.recordFlushLatency(topic, System.currentTimeMillis() - flushStartMs)
+        metrics?.commitVersion(topic, committedVersion)
 
         val flushedOffsets = partitionOffsets.toMap()
         buffer.clear()
