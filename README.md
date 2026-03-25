@@ -62,16 +62,16 @@ In CDC mode, the connector parses Debezium change events and applies inserts, up
 
 | Property                      | Type    | Default    | Description                                           |
 | ----------------------------- | ------- | ---------- | ----------------------------------------------------- |
-| `delta.storage.path`          | string  | —          | Base path for Delta tables.                           |
+| `delta.storage.path`          | string  | N/A        | Base path for Delta tables.                           |
 | `delta.write.mode`            | string  | `cdc`      | `append`, `upsert`, or `cdc`.                         |
-| `delta.merge.keys`            | list    | —          | Merge key columns. Required for `upsert` and `cdc`.   |
+| `delta.merge.keys`            | list    | N/A        | Merge key columns. Required for `upsert` and `cdc`.   |
 | `delta.table.name`            | string  | `${topic}` | Table name template. Supports `${topic}` placeholder. |
 | `delta.merge.batch.size`      | int     | `50000`    | Max records buffered before flush.                    |
 | `delta.merge.interval.ms`     | long    | `60000`    | Max time (ms) before flush.                           |
 | `delta.merge.delete.enabled`  | boolean | `true`     | Process deletes in upsert/cdc modes.                  |
 | `delta.schema.evolution`      | boolean | `true`     | Auto-evolve table schema on new columns.              |
 | `delta.checkpoint.interval`   | int     | `10`       | Commits between checkpoint writes.                    |
-| `delta.metrics.otlp.endpoint` | string  | —          | OTLP endpoint for metrics push. Empty = JMX only.     |
+| `delta.metrics.otlp.endpoint` | string  | N/A        | OTLP endpoint for metrics push. Empty = JMX only.     |
 
 ### CDC
 
@@ -85,11 +85,11 @@ In CDC mode, the connector parses Debezium change events and applies inserts, up
 | Property                         | Type     | Default  | Description                                             |
 | -------------------------------- | -------- | -------- | ------------------------------------------------------- |
 | `unity.catalog.enabled`          | boolean  | `false`  | Register tables in Unity Catalog.                       |
-| `unity.catalog.workspace.url`    | string   | —        | Databricks workspace URL.                               |
-| `unity.catalog.token`            | password | —        | Databricks PAT. Prefer workload identity in production. |
-| `unity.catalog.name`             | string   | —        | Catalog name.                                           |
-| `unity.catalog.schema`           | string   | —        | Schema name.                                            |
-| `unity.catalog.warehouse.id`     | string   | —        | SQL warehouse ID.                                       |
+| `unity.catalog.workspace.url`    | string   | N/A      | Databricks workspace URL.                               |
+| `unity.catalog.token`            | password | N/A      | Databricks PAT. Prefer workload identity in production. |
+| `unity.catalog.name`             | string   | N/A      | Catalog name.                                           |
+| `unity.catalog.schema`           | string   | N/A      | Schema name.                                            |
+| `unity.catalog.warehouse.id`     | string   | N/A      | SQL warehouse ID.                                       |
 | `unity.catalog.sync.interval.ms` | long     | `300000` | Interval between metadata sync calls.                   |
 
 ## Metrics
@@ -134,7 +134,7 @@ test(delta-azure): add Azurite conflict detection test
 - Explicit return types on public functions
 - `delta-protocol` must not depend on Kafka or cloud SDKs
 - `delta-azure` must not depend on Kafka or Connect
-- All file I/O goes through `DeltaLogStore` — no direct filesystem calls in protocol code
+- All file I/O goes through `DeltaLogStore`
 - Every change needs tests; `./gradlew test` must pass
 
 ## License
