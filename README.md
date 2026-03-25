@@ -51,6 +51,12 @@ In CDC mode, the connector parses Debezium change events and applies inserts, up
 ./gradlew ktlintFormat                 # auto fix formatting
 ```
 
+### API Docs
+
+```bash
+./gradlew dokkaHtmlMultiModule         # generate KDoc in build/dokka/htmlMultiModule/
+```
+
 ## Configuration
 
 ### Delta Lake
@@ -142,6 +148,8 @@ Every merge to `main` publishes a snapshot - `{version}-SNAPSHOT` JAR to GitHub 
 Releases use [release-please](https://github.com/googleapis/release-please). When conventional commits merge to `main`, release-please opens a Release PR that bumps the version and generates a changelog. Merging that PR creates a GitHub Release and publishes the versioned JAR and Docker image.
 
 For pre-release testing, trigger the **Release Candidate** workflow manually from the Actions tab. Provide a version like `0.2.0-rc.1` and it will publish the JAR, Docker image, and a GitHub pre-release you can point a staging environment at.
+
+API docs are generated with Dokka and deployed to GitHub Pages on each release.
 
 ## License
 

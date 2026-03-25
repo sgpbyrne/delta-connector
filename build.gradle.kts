@@ -2,12 +2,22 @@ plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.ktlint) apply false
     alias(libs.plugins.detekt) apply false
+    alias(libs.plugins.dokka)
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    dokkaHtmlMultiModulePlugin("org.jetbrains.dokka:all-modules-page-plugin:${libs.versions.dokka.get()}")
 }
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jlleitschuh.gradle.ktlint")
     apply(plugin = "io.gitlab.arturbosch.detekt")
+    apply(plugin = "org.jetbrains.dokka")
 
     group = "com.deltaconnect"
     version = rootProject.findProperty("version") as String? ?: "0.1.0-SNAPSHOT"
