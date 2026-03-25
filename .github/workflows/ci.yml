@@ -8,6 +8,10 @@ concurrency:
   group: ci-${{ github.head_ref }}
   cancel-in-progress: true
 
+permissions:
+  checks: write
+  pull-requests: write
+
 jobs:
   lint:
     name: Lint
@@ -32,13 +36,26 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew build
-      - name: Upload coverage reports
+
+      - name: Test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: dorny/test-reporter@v1
         with:
-          name: coverage-reports
-          path: "**/build/reports/jacoco/**/*.xml"
-          retention-days: 14
+          name: Unit Tests
+          path: "**/build/test-results/test/TEST-*.xml"
+          reporter: java-junit
+
+      - name: Coverage report
+        if: always()
+        uses: madrapps/jacoco-report@v1.7.1
+        with:
+          paths: "**/build/reports/jacoco/test/jacocoTestReport.xml"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          min-coverage-overall: 70
+          min-coverage-changed-files: 80
+          title: "Coverage Report"
+          update-comment: true
+
       - name: Upload shadow JAR
         uses: actions/upload-artifact@v4
         with:
@@ -57,3 +74,11 @@ jobs:
           java-version: 17
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew integrationTest
+
+      - name: Test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Integration Tests
+          path: "**/build/test-results/integrationTest/TEST-*.xml"
+          reporter: java-junit
