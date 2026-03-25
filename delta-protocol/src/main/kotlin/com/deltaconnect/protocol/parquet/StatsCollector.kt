@@ -30,8 +30,9 @@ import java.time.format.DateTimeFormatter
  *
  * @param schema Delta struct type describing the record schema.
  */
-class StatsCollector(schema: DeltaType.StructType) {
-
+class StatsCollector(
+    schema: DeltaType.StructType,
+) {
     private val columns: List<ColumnStats>
     private var recordCount: Long = 0
 
@@ -52,7 +53,10 @@ class StatsCollector(schema: DeltaType.StructType) {
         }
     }
 
-    private fun resolveNestedValue(record: GenericRecord, path: String): Any? {
+    private fun resolveNestedValue(
+        record: GenericRecord,
+        path: String,
+    ): Any? {
         val parts = path.split('.')
         var current: Any? = record
         for (part in parts) {
@@ -88,17 +92,22 @@ class StatsCollector(schema: DeltaType.StructType) {
             if (max != null) setNestedValue(maxValues, col.name, max)
         }
 
-        val stats = linkedMapOf<String, Any>(
-            "numRecords" to recordCount,
-            "minValues" to minValues,
-            "maxValues" to maxValues,
-            "nullCount" to nullCount
-        )
+        val stats =
+            linkedMapOf<String, Any>(
+                "numRecords" to recordCount,
+                "minValues" to minValues,
+                "maxValues" to maxValues,
+                "nullCount" to nullCount,
+            )
         return objectMapper.writeValueAsString(stats)
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun setNestedValue(root: MutableMap<String, Any>, path: String, value: Any) {
+    private fun setNestedValue(
+        root: MutableMap<String, Any>,
+        path: String,
+        value: Any,
+    ) {
         val parts = path.split('.')
         var current = root
         for (i in 0 until parts.size - 1) {
@@ -110,7 +119,7 @@ class StatsCollector(schema: DeltaType.StructType) {
     private fun collectLeafColumns(
         fields: List<StructField>,
         out: MutableList<ColumnStats>,
-        pathPrefix: String = ""
+        pathPrefix: String = "",
     ) {
         for (field in fields) {
             if (out.size >= MAX_STATS_COLUMNS) break
@@ -120,7 +129,8 @@ class StatsCollector(schema: DeltaType.StructType) {
                     collectLeafColumns(field.type.fields, out, fullPath)
                 }
                 is DeltaType.ArrayType,
-                is DeltaType.MapType -> {
+                is DeltaType.MapType,
+                -> {
                     // No stats for complex types
                 }
                 else -> {
@@ -146,7 +156,7 @@ class StatsCollector(schema: DeltaType.StructType) {
  */
 internal class ColumnStats(
     val name: String,
-    private val deltaType: DeltaType
+    private val deltaType: DeltaType,
 ) {
     var nullCount: Long = 0L
         private set
@@ -186,8 +196,8 @@ internal class ColumnStats(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun toComparable(value: Any): Comparable<Any>? {
-        return when (deltaType) {
+    private fun toComparable(value: Any): Comparable<Any>? =
+        when (deltaType) {
             is DeltaType.StringType -> value.toString() as Comparable<Any>
             is DeltaType.LongType -> (value as Number).toLong() as Comparable<Any>
             is DeltaType.IntegerType -> (value as Number).toInt() as Comparable<Any>
@@ -214,10 +224,12 @@ internal class ColumnStats(
             is DeltaType.MapType -> null
             is DeltaType.StructType -> null
         }
-    }
 
-    private fun serializeValue(value: Comparable<*>, isMax: Boolean): Any? {
-        return when (deltaType) {
+    private fun serializeValue(
+        value: Comparable<*>,
+        isMax: Boolean,
+    ): Any? =
+        when (deltaType) {
             is DeltaType.StringType -> {
                 val str = value as String
                 if (str.length > StatsCollector.MAX_STRING_LENGTH) {
@@ -248,7 +260,6 @@ internal class ColumnStats(
             is DeltaType.DecimalType -> (value as BigDecimal).toPlainString()
             else -> null
         }
-    }
 
     private fun incrementTruncatedMax(truncated: String): String? {
         val chars = truncated.toCharArray()

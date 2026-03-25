@@ -9,11 +9,15 @@ import org.slf4j.LoggerFactory
  * Avro [CharSequence] values are normalized to [String]
  * for consistent [MergeKey.equals] and [MergeKey.hashCode].
  */
-fun extractMergeKey(record: GenericRecord, mergeKeyNames: List<String>): MergeKey {
-    val values = mergeKeyNames.map { name ->
-        val value = record.get(name)
-        if (value is CharSequence) value.toString() else value
-    }
+fun extractMergeKey(
+    record: GenericRecord,
+    mergeKeyNames: List<String>,
+): MergeKey {
+    val values =
+        mergeKeyNames.map { name ->
+            val value = record.get(name)
+            if (value is CharSequence) value.toString() else value
+        }
     return MergeKey(values)
 }
 
@@ -33,9 +37,8 @@ fun extractMergeKey(record: GenericRecord, mergeKeyNames: List<String>): MergeKe
  */
 class RowMerger(
     private val sourceIndex: Map<MergeKey, IndexedSourceRecord>,
-    private val mergeKeyNames: List<String>
+    private val mergeKeyNames: List<String>,
 ) {
-
     /**
      * Merge a single file's rows against the source index.
      *
@@ -47,7 +50,7 @@ class RowMerger(
      */
     fun mergeFile(
         existingRows: Iterator<GenericRecord>,
-        matchedKeys: MutableSet<MergeKey>
+        matchedKeys: MutableSet<MergeKey>,
     ): FileMergeResult {
         val outputRows = mutableListOf<GenericRecord>()
         var updatedCount = 0L
@@ -66,7 +69,8 @@ class RowMerger(
                         deletedCount++
                     }
                     MergeOperation.UPDATE,
-                    MergeOperation.INSERT -> {
+                    MergeOperation.INSERT,
+                    -> {
                         updatedCount++
                         outputRows.add(match.record)
                     }
@@ -79,7 +83,10 @@ class RowMerger(
 
         logger.debug(
             "File merge complete: updated={}, deleted={}, copied={}, outputRows={}",
-            updatedCount, deletedCount, copiedCount, outputRows.size
+            updatedCount,
+            deletedCount,
+            copiedCount,
+            outputRows.size,
         )
 
         return FileMergeResult(outputRows, updatedCount, deletedCount, copiedCount)

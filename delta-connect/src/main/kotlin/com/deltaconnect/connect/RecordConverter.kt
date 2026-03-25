@@ -13,7 +13,6 @@ import org.apache.kafka.connect.sink.SinkRecord
  *
  */
 interface RecordConverter {
-
     /**
      * Convert a [SinkRecord] to a [SourceRecord] for the Delta merge engine.
      *
@@ -22,7 +21,10 @@ interface RecordConverter {
      *   When false, records with [MergeOperation.DELETE] should return null.
      * @return The converted record, or null if the record should be skipped
      */
-    fun convert(record: SinkRecord, deleteEnabled: Boolean): SourceRecord?
+    fun convert(
+        record: SinkRecord,
+        deleteEnabled: Boolean,
+    ): SourceRecord?
 
     /**
      * Extract the Delta table schema from a [SinkRecord].

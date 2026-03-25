@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory
  * (e.g. `abfss://` for Azure ADLS Gen2, `s3a://` for AWS S3).
  */
 class DeltaSinkConnector : SinkConnector() {
-
     private val log = LoggerFactory.getLogger(DeltaSinkConnector::class.java)
 
     private lateinit var configProps: Map<String, String>
@@ -33,14 +32,13 @@ class DeltaSinkConnector : SinkConnector() {
             "DeltaSinkConnector started with storage.path={}, write.mode={}, merge.keys={}",
             props[DeltaSinkConfig.DELTA_STORAGE_PATH],
             props[DeltaSinkConfig.DELTA_WRITE_MODE] ?: "cdc",
-            props[DeltaSinkConfig.DELTA_MERGE_KEYS]
+            props[DeltaSinkConfig.DELTA_MERGE_KEYS],
         )
     }
 
     override fun taskClass(): Class<out Task> = DeltaSinkTask::class.java
 
-    override fun taskConfigs(maxTasks: Int): List<Map<String, String>> =
-        (1..maxTasks).map { configProps }
+    override fun taskConfigs(maxTasks: Int): List<Map<String, String>> = (1..maxTasks).map { configProps }
 
     override fun stop() {
         log.info("Stopping DeltaSinkConnector")
@@ -70,12 +68,11 @@ class DeltaSinkConnector : SinkConnector() {
 
     private fun findBestConfigKey(
         error: String,
-        configValues: Map<String, ConfigValue>
-    ): ConfigValue? {
-        return configValues.entries
+        configValues: Map<String, ConfigValue>,
+    ): ConfigValue? =
+        configValues.entries
             .firstOrNull { (key, _) -> error.contains(key) }
             ?.value
-    }
 
     companion object {
         const val VERSION = "0.1.0-SNAPSHOT"

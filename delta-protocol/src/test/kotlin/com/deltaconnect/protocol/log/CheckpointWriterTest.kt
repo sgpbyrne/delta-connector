@@ -33,7 +33,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class CheckpointWriterTest {
-
     @TempDir
     lateinit var tempDir: Path
     private lateinit var logStore: LocalFileSystemLogStore
@@ -51,7 +50,6 @@ class CheckpointWriterTest {
 
     @Nested
     inner class WriteReadRoundtrip {
-
         @Test
         fun `round-trips Protocol`() {
             writeInitialCommit(logStore, tablePath)
@@ -81,10 +79,11 @@ class CheckpointWriterTest {
 
         @Test
         fun `round-trips AddFiles`() {
-            val files = listOf(
-                addFile("data/part-00000.parquet", size = 1024),
-                addFile("data/part-00001.parquet", size = 2048)
-            )
+            val files =
+                listOf(
+                    addFile("data/part-00000.parquet", size = 1024),
+                    addFile("data/part-00001.parquet", size = 2048),
+                )
             writeInitialCommit(logStore, tablePath, dataFiles = files)
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -102,11 +101,16 @@ class CheckpointWriterTest {
         @Test
         fun `round-trips SetTransactions`() {
             writeInitialCommit(logStore, tablePath)
-            writeCommit(logStore, tablePath, 1, listOf(
-                setTransaction("app-1", 100, 1000L),
-                setTransaction("app-2", 200, 2000L),
-                commitInfo(operation = "WRITE")
-            ))
+            writeCommit(
+                logStore,
+                tablePath,
+                1,
+                listOf(
+                    setTransaction("app-1", 100, 1000L),
+                    setTransaction("app-2", 200, 2000L),
+                    commitInfo(operation = "WRITE"),
+                ),
+            )
             val snapshot = reader.getSnapshot(tablePath)
 
             writer.writeCheckpoint(tablePath, snapshot)
@@ -132,11 +136,16 @@ class CheckpointWriterTest {
         @Test
         fun `checkpoint does not contain RemoveFile`() {
             writeInitialCommit(logStore, tablePath, listOf(addFile("data/old.parquet")))
-            writeCommit(logStore, tablePath, 1, listOf(
-                removeFile("data/old.parquet"),
-                addFile("data/new.parquet"),
-                commitInfo(operation = "WRITE")
-            ))
+            writeCommit(
+                logStore,
+                tablePath,
+                1,
+                listOf(
+                    removeFile("data/old.parquet"),
+                    addFile("data/new.parquet"),
+                    commitInfo(operation = "WRITE"),
+                ),
+            )
             val snapshot = reader.getSnapshot(tablePath)
 
             writer.writeCheckpoint(tablePath, snapshot)
@@ -151,13 +160,16 @@ class CheckpointWriterTest {
 
     @Nested
     inner class AddFileFields {
-
         @Test
         fun `round-trips AddFile with stats`() {
             val statsJson = """{"numRecords":10,"minValues":{"id":1},"maxValues":{"id":10},"nullCount":{"id":0}}"""
-            writeInitialCommit(logStore, tablePath, listOf(
-                addFile("data/part.parquet", stats = statsJson)
-            ))
+            writeInitialCommit(
+                logStore,
+                tablePath,
+                listOf(
+                    addFile("data/part.parquet", stats = statsJson),
+                ),
+            )
             val snapshot = reader.getSnapshot(tablePath)
 
             writer.writeCheckpoint(tablePath, snapshot)
@@ -169,9 +181,13 @@ class CheckpointWriterTest {
 
         @Test
         fun `round-trips AddFile with null stats`() {
-            writeInitialCommit(logStore, tablePath, listOf(
-                addFile("data/part.parquet", stats = null)
-            ))
+            writeInitialCommit(
+                logStore,
+                tablePath,
+                listOf(
+                    addFile("data/part.parquet", stats = null),
+                ),
+            )
             val snapshot = reader.getSnapshot(tablePath)
 
             writer.writeCheckpoint(tablePath, snapshot)
@@ -183,13 +199,14 @@ class CheckpointWriterTest {
 
         @Test
         fun `round-trips AddFile with partitionValues`() {
-            val file = AddFile(
-                path = "year=2024/month=01/part.parquet",
-                partitionValues = mapOf("year" to "2024", "month" to "01"),
-                size = 512,
-                modificationTime = 1000L,
-                dataChange = true
-            )
+            val file =
+                AddFile(
+                    path = "year=2024/month=01/part.parquet",
+                    partitionValues = mapOf("year" to "2024", "month" to "01"),
+                    size = 512,
+                    modificationTime = 1000L,
+                    dataChange = true,
+                )
             writeInitialCommit(logStore, tablePath, listOf(file))
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -214,13 +231,14 @@ class CheckpointWriterTest {
 
         @Test
         fun `round-trips AddFile with tags`() {
-            val file = AddFile(
-                path = "data/part.parquet",
-                size = 1024,
-                modificationTime = 1000L,
-                dataChange = true,
-                tags = mapOf("engine" to "delta-connector", "source" to "test")
-            )
+            val file =
+                AddFile(
+                    path = "data/part.parquet",
+                    size = 1024,
+                    modificationTime = 1000L,
+                    dataChange = true,
+                    tags = mapOf("engine" to "delta-connector", "source" to "test"),
+                )
             writeInitialCommit(logStore, tablePath, listOf(file))
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -234,19 +252,19 @@ class CheckpointWriterTest {
 
     @Nested
     inner class MetaDataFields {
-
         @Test
         fun `round-trips MetaData with name and description`() {
-            val meta = MetaData(
-                id = "table-with-name",
-                name = "customers",
-                description = "Customer records from SQL Server",
-                format = Format(provider = "parquet", options = mapOf("compression" to "snappy")),
-                schemaString = LogTestFixtures.SIMPLE_SCHEMA,
-                partitionColumns = listOf("year", "month"),
-                configuration = mapOf("delta.appendOnly" to "false"),
-                createdTime = 1234567890L
-            )
+            val meta =
+                MetaData(
+                    id = "table-with-name",
+                    name = "customers",
+                    description = "Customer records from SQL Server",
+                    format = Format(provider = "parquet", options = mapOf("compression" to "snappy")),
+                    schemaString = LogTestFixtures.SIMPLE_SCHEMA,
+                    partitionColumns = listOf("year", "month"),
+                    configuration = mapOf("delta.appendOnly" to "false"),
+                    createdTime = 1234567890L,
+                )
             writeCommit(logStore, tablePath, 0, listOf(protocol(), meta, commitInfo()))
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -266,10 +284,11 @@ class CheckpointWriterTest {
 
         @Test
         fun `round-trips MetaData with null optional fields`() {
-            val meta = MetaData(
-                id = "minimal-table",
-                schemaString = LogTestFixtures.SIMPLE_SCHEMA
-            )
+            val meta =
+                MetaData(
+                    id = "minimal-table",
+                    schemaString = LogTestFixtures.SIMPLE_SCHEMA,
+                )
             writeCommit(logStore, tablePath, 0, listOf(protocol(), meta, commitInfo()))
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -285,15 +304,15 @@ class CheckpointWriterTest {
 
     @Nested
     inner class ProtocolFields {
-
         @Test
         fun `round-trips Protocol with features`() {
-            val proto = Protocol(
-                minReaderVersion = 3,
-                minWriterVersion = 7,
-                readerFeatures = setOf("columnMapping", "deletionVectors"),
-                writerFeatures = setOf("columnMapping", "deletionVectors", "appendOnly")
-            )
+            val proto =
+                Protocol(
+                    minReaderVersion = 3,
+                    minWriterVersion = 7,
+                    readerFeatures = setOf("columnMapping", "deletionVectors"),
+                    writerFeatures = setOf("columnMapping", "deletionVectors", "appendOnly"),
+                )
             writeCommit(logStore, tablePath, 0, listOf(proto, metaData(), commitInfo()))
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -323,14 +342,18 @@ class CheckpointWriterTest {
 
     @Nested
     inner class SetTransactionFields {
-
         @Test
         fun `round-trips SetTransaction with null lastUpdated`() {
             writeInitialCommit(logStore, tablePath)
-            writeCommit(logStore, tablePath, 1, listOf(
-                SetTransaction(appId = "app-no-timestamp", version = 42, lastUpdated = null),
-                commitInfo()
-            ))
+            writeCommit(
+                logStore,
+                tablePath,
+                1,
+                listOf(
+                    SetTransaction(appId = "app-no-timestamp", version = 42, lastUpdated = null),
+                    commitInfo(),
+                ),
+            )
             val snapshot = reader.getSnapshot(tablePath)
 
             writer.writeCheckpoint(tablePath, snapshot)
@@ -345,7 +368,6 @@ class CheckpointWriterTest {
 
     @Nested
     inner class LastCheckpointFile {
-
         @Test
         fun `writeCheckpoint updates _last_checkpoint file`() {
             writeInitialCommit(logStore, tablePath)
@@ -361,11 +383,15 @@ class CheckpointWriterTest {
 
         @Test
         fun `_last_checkpoint size reflects action count`() {
-            writeInitialCommit(logStore, tablePath, listOf(
-                addFile("data/part-0.parquet"),
-                addFile("data/part-1.parquet"),
-                addFile("data/part-2.parquet")
-            ))
+            writeInitialCommit(
+                logStore,
+                tablePath,
+                listOf(
+                    addFile("data/part-0.parquet"),
+                    addFile("data/part-1.parquet"),
+                    addFile("data/part-2.parquet"),
+                ),
+            )
             val snapshot = reader.getSnapshot(tablePath)
 
             writer.writeCheckpoint(tablePath, snapshot)
@@ -387,27 +413,47 @@ class CheckpointWriterTest {
 
     @Nested
     inner class SnapshotViaCheckpoint {
-
         @Test
         fun `snapshot loaded from checkpoint matches full replay`() {
             writeInitialCommit(logStore, tablePath, listOf(addFile("data/v0.parquet")))
-            writeCommit(logStore, tablePath, 1, listOf(
-                addFile("data/v1.parquet"), commitInfo(operation = "WRITE")
-            ))
-            writeCommit(logStore, tablePath, 2, listOf(
-                removeFile("data/v0.parquet"),
-                addFile("data/v2.parquet"),
-                commitInfo(operation = "MERGE")
-            ))
-            writeCommit(logStore, tablePath, 3, listOf(
-                addFile("data/v3.parquet"),
-                setTransaction("app-1", 50),
-                commitInfo(operation = "WRITE")
-            ))
-            writeCommit(logStore, tablePath, 4, listOf(
-                addFile("data/v4.parquet"),
-                commitInfo(operation = "WRITE")
-            ))
+            writeCommit(
+                logStore,
+                tablePath,
+                1,
+                listOf(
+                    addFile("data/v1.parquet"),
+                    commitInfo(operation = "WRITE"),
+                ),
+            )
+            writeCommit(
+                logStore,
+                tablePath,
+                2,
+                listOf(
+                    removeFile("data/v0.parquet"),
+                    addFile("data/v2.parquet"),
+                    commitInfo(operation = "MERGE"),
+                ),
+            )
+            writeCommit(
+                logStore,
+                tablePath,
+                3,
+                listOf(
+                    addFile("data/v3.parquet"),
+                    setTransaction("app-1", 50),
+                    commitInfo(operation = "WRITE"),
+                ),
+            )
+            writeCommit(
+                logStore,
+                tablePath,
+                4,
+                listOf(
+                    addFile("data/v4.parquet"),
+                    commitInfo(operation = "WRITE"),
+                ),
+            )
 
             val fullReplaySnapshot = reader.getSnapshot(tablePath)
             writer.writeCheckpoint(tablePath, fullReplaySnapshot)
@@ -425,35 +471,63 @@ class CheckpointWriterTest {
         fun `snapshot with checkpoint plus subsequent commits`() {
             writeInitialCommit(logStore, tablePath, listOf(addFile("data/v0.parquet")))
             for (i in 1..4) {
-                writeCommit(logStore, tablePath, i.toLong(), listOf(
-                    addFile("data/v$i.parquet"), commitInfo(operation = "WRITE")
-                ))
+                writeCommit(
+                    logStore,
+                    tablePath,
+                    i.toLong(),
+                    listOf(
+                        addFile("data/v$i.parquet"),
+                        commitInfo(operation = "WRITE"),
+                    ),
+                )
             }
             val snapshotAtV4 = reader.getSnapshot(tablePath)
             writer.writeCheckpoint(tablePath, snapshotAtV4)
 
-            writeCommit(logStore, tablePath, 5, listOf(
-                addFile("data/v5.parquet"), commitInfo(operation = "WRITE")
-            ))
-            writeCommit(logStore, tablePath, 6, listOf(
-                removeFile("data/v0.parquet"),
-                commitInfo(operation = "MERGE")
-            ))
+            writeCommit(
+                logStore,
+                tablePath,
+                5,
+                listOf(
+                    addFile("data/v5.parquet"),
+                    commitInfo(operation = "WRITE"),
+                ),
+            )
+            writeCommit(
+                logStore,
+                tablePath,
+                6,
+                listOf(
+                    removeFile("data/v0.parquet"),
+                    commitInfo(operation = "MERGE"),
+                ),
+            )
 
             val snapshot = TransactionLogReader(logStore).getSnapshot(tablePath)
 
             snapshot.version shouldBe 6
             snapshot.activeFiles.map { it.path } shouldContainExactlyInAnyOrder
-                listOf("data/v1.parquet", "data/v2.parquet", "data/v3.parquet",
-                    "data/v4.parquet", "data/v5.parquet")
+                listOf(
+                    "data/v1.parquet",
+                    "data/v2.parquet",
+                    "data/v3.parquet",
+                    "data/v4.parquet",
+                    "data/v5.parquet",
+                )
         }
 
         @Test
         fun `snapshot with corrupt checkpoint falls back to full replay`() {
             writeInitialCommit(logStore, tablePath, listOf(addFile("data/v0.parquet")))
-            writeCommit(logStore, tablePath, 1, listOf(
-                addFile("data/v1.parquet"), commitInfo(operation = "WRITE")
-            ))
+            writeCommit(
+                logStore,
+                tablePath,
+                1,
+                listOf(
+                    addFile("data/v1.parquet"),
+                    commitInfo(operation = "WRITE"),
+                ),
+            )
 
             logStore.writeLastCheckpoint(tablePath, """{"version":1,"size":3}""")
 
@@ -465,7 +539,6 @@ class CheckpointWriterTest {
 
     @Nested
     inner class Validation {
-
         @Test
         fun `writeCheckpoint rejects empty table`() {
             val empty = DeltaSnapshot.empty()
@@ -476,14 +549,15 @@ class CheckpointWriterTest {
 
         @Test
         fun `writeCheckpoint rejects snapshot without Protocol`() {
-            val snapshot = DeltaSnapshot(
-                version = 0,
-                activeFiles = emptySet(),
-                metaData = metaData(),
-                protocol = null,
-                transactions = emptyMap(),
-                commitInfo = null
-            )
+            val snapshot =
+                DeltaSnapshot(
+                    version = 0,
+                    activeFiles = emptySet(),
+                    metaData = metaData(),
+                    protocol = null,
+                    transactions = emptyMap(),
+                    commitInfo = null,
+                )
             shouldThrow<IllegalArgumentException> {
                 writer.writeCheckpoint(tablePath, snapshot)
             }
@@ -491,14 +565,15 @@ class CheckpointWriterTest {
 
         @Test
         fun `writeCheckpoint rejects snapshot without MetaData`() {
-            val snapshot = DeltaSnapshot(
-                version = 0,
-                activeFiles = emptySet(),
-                metaData = null,
-                protocol = protocol(),
-                transactions = emptyMap(),
-                commitInfo = null
-            )
+            val snapshot =
+                DeltaSnapshot(
+                    version = 0,
+                    activeFiles = emptySet(),
+                    metaData = null,
+                    protocol = protocol(),
+                    transactions = emptyMap(),
+                    commitInfo = null,
+                )
             shouldThrow<IllegalArgumentException> {
                 writer.writeCheckpoint(tablePath, snapshot)
             }
@@ -507,13 +582,15 @@ class CheckpointWriterTest {
 
     @Nested
     inner class CheckpointTrigger {
-
         @Test
         fun `checkpoint is triggered at version 10`() {
-            val schema = DeltaType.StructType(listOf(
-                StructField("id", DeltaType.IntegerType, nullable = false),
-                StructField("value", DeltaType.StringType, nullable = true)
-            ))
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("value", DeltaType.StringType, nullable = true),
+                    ),
+                )
             val table = DeltaTable.createOrReplace(logStore, tablePath, schema)
 
             for (i in 1..9) {
@@ -535,9 +612,12 @@ class CheckpointWriterTest {
 
         @Test
         fun `checkpoint is not triggered at non-interval versions`() {
-            val schema = DeltaType.StructType(listOf(
-                StructField("id", DeltaType.IntegerType, nullable = false)
-            ))
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                    ),
+                )
             val table = DeltaTable.createOrReplace(logStore, tablePath, schema)
 
             for (i in 1..5) {
@@ -551,9 +631,12 @@ class CheckpointWriterTest {
 
         @Test
         fun `multiple checkpoints accumulate correctly`() {
-            val schema = DeltaType.StructType(listOf(
-                StructField("id", DeltaType.IntegerType, nullable = false)
-            ))
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                    ),
+                )
             val table = DeltaTable.createOrReplace(logStore, tablePath, schema)
 
             for (i in 1..20) {
@@ -574,7 +657,6 @@ class CheckpointWriterTest {
 
     @Nested
     inner class EdgeCases {
-
         @Test
         fun `checkpoint with many files round-trips correctly`() {
             val files = (1..50).map { addFile("data/part-$it.parquet", size = it.toLong() * 100) }
@@ -591,9 +673,16 @@ class CheckpointWriterTest {
 
         @Test
         fun `checkpoint with only protocol and metadata round-trips`() {
-            writeCommit(logStore, tablePath, 0, listOf(
-                protocol(), metaData(), commitInfo()
-            ))
+            writeCommit(
+                logStore,
+                tablePath,
+                0,
+                listOf(
+                    protocol(),
+                    metaData(),
+                    commitInfo(),
+                ),
+            )
             val snapshot = reader.getSnapshot(tablePath)
 
             writer.writeCheckpoint(tablePath, snapshot)

@@ -25,9 +25,8 @@ import java.util.UUID
  */
 class DeltaTable private constructor(
     val logStore: DeltaLogStore,
-    val tablePath: String
+    val tablePath: String,
 ) {
-
     internal val logReader: TransactionLogReader = TransactionLogReader(logStore)
     internal val logWriter: TransactionLogWriter = TransactionLogWriter(logStore)
 
@@ -54,12 +53,11 @@ class DeltaTable private constructor(
             tablePath = tablePath,
             logReader = logReader,
             logWriter = logWriter,
-            readSnapshot = currentSnapshot
+            readSnapshot = currentSnapshot,
         )
     }
 
     companion object {
-
         private val logger = LoggerFactory.getLogger(DeltaTable::class.java)
 
         /**
@@ -72,7 +70,10 @@ class DeltaTable private constructor(
          * @param tablePath Root path of the Delta table.
          * @return A [DeltaTable] handle for the given path.
          */
-        fun forPath(logStore: DeltaLogStore, tablePath: String): DeltaTable {
+        fun forPath(
+            logStore: DeltaLogStore,
+            tablePath: String,
+        ): DeltaTable {
             logger.debug("Opening table: path={}", tablePath)
             return DeltaTable(logStore, tablePath)
         }
@@ -100,7 +101,7 @@ class DeltaTable private constructor(
             schema: DeltaType.StructType,
             partitionColumns: List<String> = emptyList(),
             configuration: Map<String, String> = emptyMap(),
-            engineInfo: String? = null
+            engineInfo: String? = null,
         ): DeltaTable {
             val table = DeltaTable(logStore, tablePath)
             val currentSnapshot = table.snapshot()
@@ -109,14 +110,15 @@ class DeltaTable private constructor(
             val now = System.currentTimeMillis()
 
             val protocol = Protocol(minReaderVersion = 1, minWriterVersion = 2)
-            val metaData = MetaData(
-                id = UUID.randomUUID().toString(),
-                format = Format(),
-                schemaString = DeltaSchema.toJson(schema),
-                partitionColumns = partitionColumns,
-                configuration = configuration,
-                createdTime = now
-            )
+            val metaData =
+                MetaData(
+                    id = UUID.randomUUID().toString(),
+                    format = Format(),
+                    schemaString = DeltaSchema.toJson(schema),
+                    partitionColumns = partitionColumns,
+                    configuration = configuration,
+                    createdTime = now,
+                )
 
             val actions = mutableListOf<Action>(protocol, metaData)
 
@@ -126,8 +128,8 @@ class DeltaTable private constructor(
                         RemoveFile(
                             path = addFile.path,
                             deletionTimestamp = now,
-                            dataChange = true
-                        )
+                            dataChange = true,
+                        ),
                     )
                 }
             }
@@ -137,8 +139,8 @@ class DeltaTable private constructor(
                     timestamp = now,
                     operation = if (isNew) "CREATE TABLE" else "CREATE OR REPLACE TABLE",
                     engineInfo = engineInfo,
-                    isBlindAppend = isNew
-                )
+                    isBlindAppend = isNew,
+                ),
             )
 
             val targetVersion = currentSnapshot.version + 1
@@ -148,7 +150,7 @@ class DeltaTable private constructor(
                 "Table {}: path={}, version={}",
                 if (isNew) "created" else "replaced",
                 tablePath,
-                targetVersion
+                targetVersion,
             )
 
             return table

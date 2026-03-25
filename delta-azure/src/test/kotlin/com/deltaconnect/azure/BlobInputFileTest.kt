@@ -14,10 +14,8 @@ import java.io.OutputStream
 import java.nio.ByteBuffer
 
 class BlobInputFileTest {
-
     @Nested
     inner class Length {
-
         @Test
         fun `returns file size`() {
             val blobClient = mockk<BlobClient>()
@@ -28,7 +26,6 @@ class BlobInputFileTest {
 
     @Nested
     inner class SeekableStream {
-
         @Test
         fun `reads single bytes sequentially`() {
             val data = byteArrayOf(0x41, 0x42, 0x43) // A, B, C
@@ -203,7 +200,15 @@ class BlobInputFileTest {
         val rangeSlot = slot<BlobRange>()
 
         every {
-            blobClient.downloadStreamWithResponse(any<OutputStream>(), capture(rangeSlot), any(), any(), any(), any(), any())
+            blobClient.downloadStreamWithResponse(
+                any<OutputStream>(),
+                capture(rangeSlot),
+                any(),
+                any(),
+                any(),
+                any(),
+                any(),
+            )
         } answers {
             val outputStream = firstArg<OutputStream>()
             val range = rangeSlot.captured

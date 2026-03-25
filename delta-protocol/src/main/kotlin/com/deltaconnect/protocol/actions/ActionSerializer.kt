@@ -20,28 +20,27 @@ import com.fasterxml.jackson.module.kotlin.readValue
  * Multiple actions form a commit file.
  */
 object ActionSerializer {
-
-    private val mapper: ObjectMapper = jacksonObjectMapper()
-        .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    private val mapper: ObjectMapper =
+        jacksonObjectMapper()
+            .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
     /** Serialize a single action to a JSON line (no trailing newline). */
     fun serialize(action: Action): String {
-        val (key, value) = when (action) {
-            is AddFile -> "add" to mapper.valueToTree<JsonNode>(action)
-            is RemoveFile -> "remove" to mapper.valueToTree<JsonNode>(action)
-            is MetaData -> "metaData" to mapper.valueToTree<JsonNode>(action)
-            is Protocol -> "protocol" to mapper.valueToTree<JsonNode>(action)
-            is SetTransaction -> "txn" to mapper.valueToTree<JsonNode>(action)
-            is CommitInfo -> "commitInfo" to mapper.valueToTree<JsonNode>(action)
-        }
+        val (key, value) =
+            when (action) {
+                is AddFile -> "add" to mapper.valueToTree<JsonNode>(action)
+                is RemoveFile -> "remove" to mapper.valueToTree<JsonNode>(action)
+                is MetaData -> "metaData" to mapper.valueToTree<JsonNode>(action)
+                is Protocol -> "protocol" to mapper.valueToTree<JsonNode>(action)
+                is SetTransaction -> "txn" to mapper.valueToTree<JsonNode>(action)
+                is CommitInfo -> "commitInfo" to mapper.valueToTree<JsonNode>(action)
+            }
         return mapper.writeValueAsString(mapOf(key to value))
     }
 
     /** Serialize a list of actions to a commit file (newline-delimited JSON). */
-    fun serializeActions(actions: List<Action>): String {
-        return actions.joinToString("\n") { serialize(it) }
-    }
+    fun serializeActions(actions: List<Action>): String = actions.joinToString("\n") { serialize(it) }
 
     /** Deserialize a single JSON line to an action. */
     fun deserialize(json: String): Action {
@@ -58,11 +57,11 @@ object ActionSerializer {
     }
 
     /** Deserialize a commit file (newline-delimited JSON) to a list of actions. */
-    fun deserializeActions(content: String): List<Action> {
-        return content.lines()
+    fun deserializeActions(content: String): List<Action> =
+        content
+            .lines()
             .filter { it.isNotBlank() }
             .map { deserialize(it) }
-    }
 
     /** Format a commit version as a zero-padded 20-digit filename. */
     fun commitFileName(version: Long): String = "%020d.json".format(version)

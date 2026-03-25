@@ -1,16 +1,12 @@
 package com.deltaconnect.azure
 
 import com.deltaconnect.protocol.DeltaTable
-import com.deltaconnect.protocol.actions.CommitInfo
-import com.deltaconnect.protocol.actions.MetaData
-import com.deltaconnect.protocol.actions.Protocol
 import com.deltaconnect.protocol.merge.DeltaMergeEngine
 import com.deltaconnect.protocol.merge.MergeOperation
 import com.deltaconnect.protocol.merge.SourceRecord
 import com.deltaconnect.protocol.parquet.ParquetFileReader
 import com.deltaconnect.protocol.parquet.ParquetFileWriter
 import com.deltaconnect.protocol.schema.AvroToDeltaConverter
-import com.deltaconnect.protocol.schema.DeltaSchema
 import com.deltaconnect.protocol.schema.DeltaType
 import com.deltaconnect.protocol.schema.StructField
 import com.deltaconnect.protocol.storage.CommitConflictException
@@ -38,7 +34,6 @@ import org.testcontainers.utility.DockerImageName
  */
 @Testcontainers
 class AzuriteIntegrationTest {
-
     companion object {
         private const val ACCOUNT_NAME = "devstoreaccount1"
         private const val ACCOUNT_KEY =
@@ -47,11 +42,11 @@ class AzuriteIntegrationTest {
 
         @Container
         @JvmStatic
-        val azurite: GenericContainer<*> = GenericContainer(
-            DockerImageName.parse("mcr.microsoft.com/azure-storage/azurite:3.34.0")
-        )
-            .withExposedPorts(10000) // Blob service
-            .withCommand("azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000")
+        val azurite: GenericContainer<*> =
+            GenericContainer(
+                DockerImageName.parse("mcr.microsoft.com/azure-storage/azurite:3.34.0"),
+            ).withExposedPorts(10000) // Blob service
+                .withCommand("azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000")
 
         private lateinit var logStore: AzureBlobLogStore
 
@@ -60,13 +55,14 @@ class AzuriteIntegrationTest {
         fun setUpContainer() {
             val blobEndpoint = "http://127.0.0.1:${azurite.getMappedPort(10000)}/$ACCOUNT_NAME"
 
-            val config = AzureBlobConfig(
-                authType = AzureAuthType.STORAGE_KEY,
-                accountName = ACCOUNT_NAME,
-                containerName = CONTAINER_NAME,
-                accountKey = ACCOUNT_KEY,
-                endpoint = blobEndpoint
-            )
+            val config =
+                AzureBlobConfig(
+                    authType = AzureAuthType.STORAGE_KEY,
+                    accountName = ACCOUNT_NAME,
+                    containerName = CONTAINER_NAME,
+                    accountKey = ACCOUNT_KEY,
+                    endpoint = blobEndpoint,
+                )
 
             val client = AzureBlobConfigurer.createContainerClient(config)
             try {
@@ -87,7 +83,6 @@ class AzuriteIntegrationTest {
 
     @Nested
     inner class CommitOperations {
-
         @Test
         fun `write and read commit roundtrip`() {
             val content = """{"protocol":{"minReaderVersion":1,"minWriterVersion":2}}""".toByteArray()
@@ -136,7 +131,6 @@ class AzuriteIntegrationTest {
 
     @Nested
     inner class DataFileOperations {
-
         @Test
         fun `write and read data file`() {
             val filePath = "$testTable/data/test.bin"
@@ -150,20 +144,22 @@ class AzuriteIntegrationTest {
 
         @Test
         fun `write and read Parquet file through Azure Blob`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
 
-            val records = (1..10).map { i ->
-                val rec = GenericData.Record(avroSchema)
-                rec.put("id", i)
-                rec.put("name", "user_$i")
-                rec
-            }
+            val records =
+                (1..10).map { i ->
+                    val rec = GenericData.Record(avroSchema)
+                    rec.put("id", i)
+                    rec.put("name", "user_$i")
+                    rec
+                }
 
             val filePath = "$testTable/data/part-001.parquet"
             val writer = ParquetFileWriter(logStore, schema)
@@ -181,7 +177,6 @@ class AzuriteIntegrationTest {
 
     @Nested
     inner class CheckpointOperations {
-
         @Test
         fun `write and read last checkpoint`() {
             logStore.writeLastCheckpoint(testTable, """{"version":5}""")
@@ -206,29 +201,30 @@ class AzuriteIntegrationTest {
 
     @Nested
     inner class EndToEnd {
-
         @Test
         fun `create table, write, merge, read back through Azure Blob`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true),
-                    StructField("value", DeltaType.IntegerType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                        StructField("value", DeltaType.IntegerType, nullable = true),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
 
             val table = DeltaTable.createOrReplace(logStore, testTable, schema)
             table.snapshot().version shouldBe 0L
 
             val mergeEngine = DeltaMergeEngine(logStore, schema, listOf("id"), testTable)
-            val insertRecords = (1..5).map { i ->
-                val rec = GenericData.Record(avroSchema)
-                rec.put("id", i)
-                rec.put("name", "user_$i")
-                rec.put("value", i * 100)
-                SourceRecord(rec, MergeOperation.INSERT)
-            }
+            val insertRecords =
+                (1..5).map { i ->
+                    val rec = GenericData.Record(avroSchema)
+                    rec.put("id", i)
+                    rec.put("name", "user_$i")
+                    rec.put("value", i * 100)
+                    SourceRecord(rec, MergeOperation.INSERT)
+                }
 
             val txn1 = table.startTransaction()
             val mergeResult1 = mergeEngine.merge(table.snapshot(), insertRecords)
@@ -243,16 +239,17 @@ class AzuriteIntegrationTest {
             val rows1 = snapshot1.activeFiles.flatMap { reader.read(it.path) }
             rows1 shouldHaveSize 5
 
-            val updateRecords = listOf(
-                SourceRecord(
-                    GenericData.Record(avroSchema).apply {
-                        put("id", 3)
-                        put("name", "updated_3")
-                        put("value", 999)
-                    },
-                    MergeOperation.UPDATE
+            val updateRecords =
+                listOf(
+                    SourceRecord(
+                        GenericData.Record(avroSchema).apply {
+                            put("id", 3)
+                            put("name", "updated_3")
+                            put("value", 999)
+                        },
+                        MergeOperation.UPDATE,
+                    ),
                 )
-            )
 
             val txn2 = table.startTransaction()
             val mergeResult2 = mergeEngine.merge(table.snapshot(), updateRecords)

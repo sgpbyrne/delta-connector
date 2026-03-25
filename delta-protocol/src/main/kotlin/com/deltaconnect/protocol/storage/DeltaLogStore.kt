@@ -12,7 +12,6 @@ import java.io.OutputStream
  *
  */
 interface DeltaLogStore {
-
     /**
      * Atomically write a commit file for the given version.
      *
@@ -21,19 +20,29 @@ interface DeltaLogStore {
      * @param content Serialized commit actions (newline-delimited JSON).
      * @throws CommitConflictException if the version file already exists.
      */
-    fun writeCommit(tablePath: String, version: Long, content: ByteArray)
+    fun writeCommit(
+        tablePath: String,
+        version: Long,
+        content: ByteArray,
+    )
 
     /**
      * Read a commit file for the given version.
      *
      * @return The commit file content, or null if the version does not exist.
      */
-    fun readCommit(tablePath: String, version: Long): ByteArray?
+    fun readCommit(
+        tablePath: String,
+        version: Long,
+    ): ByteArray?
 
     /**
      * List all commit versions at or after [startVersion], sorted ascending.
      */
-    fun listCommitVersions(tablePath: String, startVersion: Long = 0): List<Long>
+    fun listCommitVersions(
+        tablePath: String,
+        startVersion: Long = 0,
+    ): List<Long>
 
     /**
      * Create a data file and return an output stream for writing.
@@ -64,5 +73,8 @@ interface DeltaLogStore {
     /**
      * Write (overwrite) the `_last_checkpoint` file for the given table.
      */
-    fun writeLastCheckpoint(tablePath: String, content: String)
+    fun writeLastCheckpoint(
+        tablePath: String,
+        content: String,
+    )
 }

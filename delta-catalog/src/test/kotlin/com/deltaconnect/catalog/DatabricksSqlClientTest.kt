@@ -12,7 +12,6 @@ import org.junit.jupiter.api.assertThrows
 import java.net.InetSocketAddress
 
 class DatabricksSqlClientTest {
-
     private lateinit var server: HttpServer
     private lateinit var client: DatabricksSqlClient
     private val mapper = jacksonObjectMapper()
@@ -24,11 +23,12 @@ class DatabricksSqlClientTest {
         server = HttpServer.create(InetSocketAddress(0), 0)
         val port = server.address.port
 
-        client = DatabricksSqlClient(
-            workspaceUrl = "http://localhost:$port",
-            warehouseId = "test-warehouse-id",
-            tokenSupplier = { "test-token-123" }
-        )
+        client =
+            DatabricksSqlClient(
+                workspaceUrl = "http://localhost:$port",
+                warehouseId = "test-warehouse-id",
+                tokenSupplier = { "test-token-123" },
+            )
     }
 
     @AfterEach
@@ -38,19 +38,19 @@ class DatabricksSqlClientTest {
 
     @Nested
     inner class ExecuteStatement {
-
         @Test
         fun `sends correct request and parses success response`() {
             server.createContext("/api/2.0/sql/statements") { exchange ->
                 lastRequestBody = exchange.requestBody.bufferedReader().readText()
                 lastAuthHeader = exchange.requestHeaders.getFirst("Authorization")
 
-                val response = """
+                val response =
+                    """
                     {
                         "statement_id": "stmt-001",
                         "status": { "state": "SUCCEEDED" }
                     }
-                """.trimIndent()
+                    """.trimIndent()
                 exchange.sendResponseHeaders(200, response.toByteArray().size.toLong())
                 exchange.responseBody.use { it.write(response.toByteArray()) }
             }
@@ -70,7 +70,8 @@ class DatabricksSqlClientTest {
         @Test
         fun `throws on FAILED state`() {
             server.createContext("/api/2.0/sql/statements") { exchange ->
-                val response = """
+                val response =
+                    """
                     {
                         "statement_id": "stmt-002",
                         "status": {
@@ -81,15 +82,16 @@ class DatabricksSqlClientTest {
                             }
                         }
                     }
-                """.trimIndent()
+                    """.trimIndent()
                 exchange.sendResponseHeaders(200, response.toByteArray().size.toLong())
                 exchange.responseBody.use { it.write(response.toByteArray()) }
             }
             server.start()
 
-            val ex = assertThrows<SqlExecutionException> {
-                client.executeStatement("CREATE TABLE t LOCATION 'x'")
-            }
+            val ex =
+                assertThrows<SqlExecutionException> {
+                    client.executeStatement("CREATE TABLE t LOCATION 'x'")
+                }
             ex.message shouldContain "Schema 'test_schema' not found"
         }
 
@@ -102,23 +104,24 @@ class DatabricksSqlClientTest {
             }
             server.start()
 
-            val ex = assertThrows<SqlExecutionException> {
-                client.executeStatement("SELECT 1")
-            }
+            val ex =
+                assertThrows<SqlExecutionException> {
+                    client.executeStatement("SELECT 1")
+                }
             ex.message shouldContain "401"
         }
     }
 
     @Nested
     inner class RegisterTable {
-
         @Test
         fun `generates correct CREATE TABLE statement`() {
             server.createContext("/api/2.0/sql/statements") { exchange ->
                 lastRequestBody = exchange.requestBody.bufferedReader().readText()
-                val response = """
+                val response =
+                    """
                     { "statement_id": "stmt-003", "status": { "state": "SUCCEEDED" } }
-                """.trimIndent()
+                    """.trimIndent()
                 exchange.sendResponseHeaders(200, response.toByteArray().size.toLong())
                 exchange.responseBody.use { it.write(response.toByteArray()) }
             }
@@ -128,7 +131,7 @@ class DatabricksSqlClientTest {
                 catalog = "my_catalog",
                 schema = "my_schema",
                 tableName = "orders",
-                location = "abfss://container@account.dfs.core.windows.net/delta/orders"
+                location = "abfss://container@account.dfs.core.windows.net/delta/orders",
             )
 
             val body = mapper.readTree(lastRequestBody)
@@ -142,14 +145,14 @@ class DatabricksSqlClientTest {
 
     @Nested
     inner class RefreshTable {
-
         @Test
         fun `generates correct REPAIR TABLE statement`() {
             server.createContext("/api/2.0/sql/statements") { exchange ->
                 lastRequestBody = exchange.requestBody.bufferedReader().readText()
-                val response = """
+                val response =
+                    """
                     { "statement_id": "stmt-004", "status": { "state": "SUCCEEDED" } }
-                """.trimIndent()
+                    """.trimIndent()
                 exchange.sendResponseHeaders(200, response.toByteArray().size.toLong())
                 exchange.responseBody.use { it.write(response.toByteArray()) }
             }
@@ -158,7 +161,7 @@ class DatabricksSqlClientTest {
             client.refreshTable(
                 catalog = "my_catalog",
                 schema = "my_schema",
-                tableName = "orders"
+                tableName = "orders",
             )
 
             val body = mapper.readTree(lastRequestBody)

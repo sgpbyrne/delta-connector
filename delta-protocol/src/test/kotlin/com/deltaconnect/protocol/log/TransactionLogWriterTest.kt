@@ -13,7 +13,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class TransactionLogWriterTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -30,14 +29,14 @@ class TransactionLogWriterTest {
 
     @Nested
     inner class BasicCommit {
-
         @Test
         fun `writes commit and reads it back`() {
-            val actions = listOf(
-                LogTestFixtures.protocol(),
-                LogTestFixtures.metaData(),
-                LogTestFixtures.commitInfo(operation = "CREATE TABLE")
-            )
+            val actions =
+                listOf(
+                    LogTestFixtures.protocol(),
+                    LogTestFixtures.metaData(),
+                    LogTestFixtures.commitInfo(operation = "CREATE TABLE"),
+                )
 
             writer.commit(tablePath, 0L, actions)
 
@@ -47,27 +46,40 @@ class TransactionLogWriterTest {
 
         @Test
         fun `writes sequential versions`() {
-            writer.commit(tablePath, 0L, listOf(
-                LogTestFixtures.protocol(),
-                LogTestFixtures.metaData()
-            ))
-            writer.commit(tablePath, 1L, listOf(
-                LogTestFixtures.addFile("data-001.parquet")
-            ))
-            writer.commit(tablePath, 2L, listOf(
-                LogTestFixtures.addFile("data-002.parquet")
-            ))
+            writer.commit(
+                tablePath,
+                0L,
+                listOf(
+                    LogTestFixtures.protocol(),
+                    LogTestFixtures.metaData(),
+                ),
+            )
+            writer.commit(
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet"),
+                ),
+            )
+            writer.commit(
+                tablePath,
+                2L,
+                listOf(
+                    LogTestFixtures.addFile("data-002.parquet"),
+                ),
+            )
 
             logStore.listCommitVersions(tablePath) shouldBe listOf(0L, 1L, 2L)
         }
 
         @Test
         fun `serializes actions as newline-delimited JSON`() {
-            val actions = listOf(
-                LogTestFixtures.protocol(),
-                LogTestFixtures.metaData(),
-                LogTestFixtures.addFile("data-001.parquet")
-            )
+            val actions =
+                listOf(
+                    LogTestFixtures.protocol(),
+                    LogTestFixtures.metaData(),
+                    LogTestFixtures.addFile("data-001.parquet"),
+                )
 
             writer.commit(tablePath, 0L, actions)
 
@@ -82,7 +94,6 @@ class TransactionLogWriterTest {
 
     @Nested
     inner class ConflictDetection {
-
         @Test
         fun `throws CommitConflictException on duplicate version`() {
             writer.commit(tablePath, 0L, listOf(LogTestFixtures.protocol()))
@@ -95,12 +106,12 @@ class TransactionLogWriterTest {
 
     @Nested
     inner class Validation {
-
         @Test
         fun `rejects empty actions list`() {
-            val ex = assertThrows<IllegalArgumentException> {
-                writer.commit(tablePath, 0L, emptyList())
-            }
+            val ex =
+                assertThrows<IllegalArgumentException> {
+                    writer.commit(tablePath, 0L, emptyList())
+                }
             ex.message shouldContain "empty"
         }
     }

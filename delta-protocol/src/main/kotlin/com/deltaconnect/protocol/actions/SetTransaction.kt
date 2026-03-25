@@ -14,5 +14,5 @@ package com.deltaconnect.protocol.actions
 data class SetTransaction(
     val appId: String,
     val version: Long,
-    val lastUpdated: Long? = null
+    val lastUpdated: Long? = null,
 ) : Action

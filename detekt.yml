@@ -1,0 +1,77 @@
+build:
+  maxIssues: 0
+
+complexity:
+  ComplexCondition:
+    active: true
+    threshold: 5
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 25
+  LongMethod:
+    active: true
+    threshold: 80
+  LongParameterList:
+    active: true
+    functionThreshold: 8
+    constructorThreshold: 10
+    ignoreDefaultParameters: true
+    ignoreDataClasses: true
+  NestedBlockDepth:
+    active: true
+    threshold: 5
+  TooManyFunctions:
+    active: true
+    excludes: ["**/test/**", "**/integrationTest/**"]
+    thresholdInFiles: 15
+    thresholdInClasses: 15
+    thresholdInInterfaces: 15
+    thresholdInObjects: 15
+    thresholdInEnums: 11
+    ignorePrivate: true
+
+exceptions:
+  SwallowedException:
+    active: true
+    ignoredExceptionTypes:
+      - "InterruptedException"
+      - "FileAlreadyExistsException"
+      - "MalformedURLException"
+      - "NumberFormatException"
+      - "ParseException"
+  TooGenericExceptionCaught:
+    active: true
+    excludes: ["**/test/**", "**/integrationTest/**"]
+  TooGenericExceptionThrown:
+    active: true
+    excludes: ["**/test/**", "**/integrationTest/**"]
+
+naming:
+  FunctionNaming:
+    active: true
+    excludes: ["**/test/**", "**/integrationTest/**"]
+  MatchingDeclarationName:
+    active: false
+
+style:
+  ForbiddenComment:
+    active: false
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: true
+    maxLineLength: 120
+    excludeCommentStatements: true
+  ReturnCount:
+    active: true
+    max: 5
+    excludeGuardClauses: true
+  ThrowsCount:
+    active: true
+    max: 4
+  WildcardImport:
+    active: true
+
+performance:
+  SpreadOperator:
+    active: false

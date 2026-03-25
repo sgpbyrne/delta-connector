@@ -8,7 +8,6 @@ import org.apache.kafka.common.config.ConfigDef
 import org.junit.jupiter.api.Test
 
 class AzureStorageProviderTest {
-
     private val provider = AzureStorageProvider()
 
     @Test
@@ -29,39 +28,43 @@ class AzureStorageProviderTest {
 
     @Test
     fun `validate passes with valid identity config`() {
-        val props = mapOf(
-            AzureStorageProvider.AZURE_AUTH_TYPE to "identity",
-            AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "myaccount"
-        )
+        val props =
+            mapOf(
+                AzureStorageProvider.AZURE_AUTH_TYPE to "identity",
+                AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "myaccount",
+            )
         provider.validate(props).shouldBeEmpty()
     }
 
     @Test
     fun `validate passes with valid storage_key config`() {
-        val props = mapOf(
-            AzureStorageProvider.AZURE_AUTH_TYPE to "storage_key",
-            AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "myaccount",
-            AzureStorageProvider.AZURE_STORAGE_ACCOUNT_KEY to "dGVzdGtleQ=="
-        )
+        val props =
+            mapOf(
+                AzureStorageProvider.AZURE_AUTH_TYPE to "storage_key",
+                AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "myaccount",
+                AzureStorageProvider.AZURE_STORAGE_ACCOUNT_KEY to "dGVzdGtleQ==",
+            )
         provider.validate(props).shouldBeEmpty()
     }
 
     @Test
     fun `validate passes with valid sas_token config`() {
-        val props = mapOf(
-            AzureStorageProvider.AZURE_AUTH_TYPE to "sas_token",
-            AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "myaccount",
-            AzureStorageProvider.AZURE_SAS_TOKEN to "sv=2021-06-08&ss=bfqt&srt=sco"
-        )
+        val props =
+            mapOf(
+                AzureStorageProvider.AZURE_AUTH_TYPE to "sas_token",
+                AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "myaccount",
+                AzureStorageProvider.AZURE_SAS_TOKEN to "sv=2021-06-08&ss=bfqt&srt=sco",
+            )
         provider.validate(props).shouldBeEmpty()
     }
 
     @Test
     fun `validate requires account name`() {
-        val props = mapOf(
-            AzureStorageProvider.AZURE_AUTH_TYPE to "identity",
-            AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to ""
-        )
+        val props =
+            mapOf(
+                AzureStorageProvider.AZURE_AUTH_TYPE to "identity",
+                AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "",
+            )
         val errors = provider.validate(props)
         errors shouldHaveSize 1
         errors[0] shouldContain AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME
@@ -69,11 +72,12 @@ class AzureStorageProviderTest {
 
     @Test
     fun `validate requires account key for storage_key auth`() {
-        val props = mapOf(
-            AzureStorageProvider.AZURE_AUTH_TYPE to "storage_key",
-            AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "myaccount",
-            AzureStorageProvider.AZURE_STORAGE_ACCOUNT_KEY to ""
-        )
+        val props =
+            mapOf(
+                AzureStorageProvider.AZURE_AUTH_TYPE to "storage_key",
+                AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "myaccount",
+                AzureStorageProvider.AZURE_STORAGE_ACCOUNT_KEY to "",
+            )
         val errors = provider.validate(props)
         errors shouldHaveSize 1
         errors[0] shouldContain AzureStorageProvider.AZURE_STORAGE_ACCOUNT_KEY
@@ -81,10 +85,11 @@ class AzureStorageProviderTest {
 
     @Test
     fun `validate requires sas token for sas_token auth`() {
-        val props = mapOf(
-            AzureStorageProvider.AZURE_AUTH_TYPE to "sas_token",
-            AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "myaccount"
-        )
+        val props =
+            mapOf(
+                AzureStorageProvider.AZURE_AUTH_TYPE to "sas_token",
+                AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "myaccount",
+            )
         val errors = provider.validate(props)
         errors shouldHaveSize 1
         errors[0] shouldContain AzureStorageProvider.AZURE_SAS_TOKEN
@@ -92,11 +97,12 @@ class AzureStorageProviderTest {
 
     @Test
     fun `validate reports multiple errors`() {
-        val props = mapOf(
-            AzureStorageProvider.AZURE_AUTH_TYPE to "storage_key",
-            AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to ""
-            // Missing account key AND account name
-        )
+        val props =
+            mapOf(
+                AzureStorageProvider.AZURE_AUTH_TYPE to "storage_key",
+                AzureStorageProvider.AZURE_STORAGE_ACCOUNT_NAME to "",
+                // Missing account key AND account name
+            )
         val errors = provider.validate(props)
         errors shouldHaveSize 2
     }
@@ -104,28 +110,28 @@ class AzureStorageProviderTest {
     @Test
     fun `parseBasePath extracts path from abfss URI`() {
         provider.parseBasePath(
-            "abfss://container@account.dfs.core.windows.net/base/path"
+            "abfss://container@account.dfs.core.windows.net/base/path",
         ) shouldBe "base/path"
     }
 
     @Test
     fun `parseBasePath handles empty path`() {
         provider.parseBasePath(
-            "abfss://container@account.dfs.core.windows.net/"
+            "abfss://container@account.dfs.core.windows.net/",
         ) shouldBe ""
     }
 
     @Test
     fun `parseBasePath handles root path`() {
         provider.parseBasePath(
-            "abfss://container@account.dfs.core.windows.net"
+            "abfss://container@account.dfs.core.windows.net",
         ) shouldBe ""
     }
 
     @Test
     fun `parseContainer extracts container from abfss URI`() {
         AzureStorageProvider.parseContainer(
-            "abfss://mycontainer@myaccount.dfs.core.windows.net/data"
+            "abfss://mycontainer@myaccount.dfs.core.windows.net/data",
         ) shouldBe "mycontainer"
     }
 }

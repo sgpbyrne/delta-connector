@@ -23,5 +23,5 @@ data class MetaData(
     val schemaString: String,
     val partitionColumns: List<String> = emptyList(),
     val configuration: Map<String, String> = emptyMap(),
-    val createdTime: Long? = null
+    val createdTime: Long? = null,
 ) : Action

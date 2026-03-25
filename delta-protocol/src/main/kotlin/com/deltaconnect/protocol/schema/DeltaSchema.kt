@@ -22,7 +22,6 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
  * ```
  */
 object DeltaSchema {
-
     private val mapper: ObjectMapper = jacksonObjectMapper()
 
     /** Parse a Delta JSON schema string into a [DeltaType.StructType]. */
@@ -34,9 +33,7 @@ object DeltaSchema {
     }
 
     /** Serialize a [DeltaType.StructType] to a Delta JSON schema string. */
-    fun toJson(structType: DeltaType.StructType): String {
-        return mapper.writeValueAsString(typeToNode(structType))
-    }
+    fun toJson(structType: DeltaType.StructType): String = mapper.writeValueAsString(typeToNode(structType))
 
     private fun parseType(node: JsonNode): DeltaType {
         if (node.isTextual) {
@@ -76,31 +73,30 @@ object DeltaSchema {
     }
 
     private fun parseStructType(node: JsonNode): DeltaType.StructType {
-        val fields = node["fields"].map { fieldNode ->
-            StructField(
-                name = fieldNode["name"].asText(),
-                type = parseType(fieldNode["type"]),
-                nullable = fieldNode["nullable"].asBoolean(true),
-                metadata = parseMetadata(fieldNode["metadata"])
-            )
-        }
+        val fields =
+            node["fields"].map { fieldNode ->
+                StructField(
+                    name = fieldNode["name"].asText(),
+                    type = parseType(fieldNode["type"]),
+                    nullable = fieldNode["nullable"].asBoolean(true),
+                    metadata = parseMetadata(fieldNode["metadata"]),
+                )
+            }
         return DeltaType.StructType(fields)
     }
 
-    private fun parseArrayType(node: JsonNode): DeltaType.ArrayType {
-        return DeltaType.ArrayType(
+    private fun parseArrayType(node: JsonNode): DeltaType.ArrayType =
+        DeltaType.ArrayType(
             elementType = parseType(node["elementType"]),
-            containsNull = node["containsNull"].asBoolean(true)
+            containsNull = node["containsNull"].asBoolean(true),
         )
-    }
 
-    private fun parseMapType(node: JsonNode): DeltaType.MapType {
-        return DeltaType.MapType(
+    private fun parseMapType(node: JsonNode): DeltaType.MapType =
+        DeltaType.MapType(
             keyType = parseType(node["keyType"]),
             valueType = parseType(node["valueType"]),
-            valueContainsNull = node["valueContainsNull"].asBoolean(true)
+            valueContainsNull = node["valueContainsNull"].asBoolean(true),
         )
-    }
 
     @Suppress("UNCHECKED_CAST")
     private fun parseMetadata(node: JsonNode?): Map<String, Any> {
@@ -108,14 +104,13 @@ object DeltaSchema {
         return mapper.convertValue(node, Map::class.java) as Map<String, Any>
     }
 
-    private fun typeToNode(type: DeltaType): JsonNode {
-        return when (type) {
+    private fun typeToNode(type: DeltaType): JsonNode =
+        when (type) {
             is DeltaType.StructType -> structTypeToNode(type)
             is DeltaType.ArrayType -> arrayTypeToNode(type)
             is DeltaType.MapType -> mapTypeToNode(type)
             else -> mapper.nodeFactory.textNode(type.typeName)
         }
-    }
 
     private fun structTypeToNode(type: DeltaType.StructType): ObjectNode {
         val node = mapper.createObjectNode()

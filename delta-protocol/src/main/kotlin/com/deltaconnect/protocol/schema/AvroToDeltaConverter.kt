@@ -9,38 +9,43 @@ import org.apache.avro.Schema as AvroSchema
  * Used by the Parquet writer/reader which works with Avro's GenericRecord.
  */
 object AvroToDeltaConverter {
-
     /** Convert a Delta StructType to an Avro Schema (record type). */
-    fun toAvroSchema(structType: DeltaType.StructType, recordName: String = "record"): AvroSchema {
-        val fields = structType.fields.map { field ->
-            val avroType = deltaTypeToAvro(field.type)
-            val fieldSchema = if (field.nullable) {
-                AvroSchema.createUnion(AvroSchema.create(AvroSchema.Type.NULL), avroType)
-            } else {
-                avroType
+    fun toAvroSchema(
+        structType: DeltaType.StructType,
+        recordName: String = "record",
+    ): AvroSchema {
+        val fields =
+            structType.fields.map { field ->
+                val avroType = deltaTypeToAvro(field.type)
+                val fieldSchema =
+                    if (field.nullable) {
+                        AvroSchema.createUnion(AvroSchema.create(AvroSchema.Type.NULL), avroType)
+                    } else {
+                        avroType
+                    }
+                val defaultValue = if (field.nullable) AvroSchema.Field.NULL_DEFAULT_VALUE else null
+                AvroSchema.Field(field.name, fieldSchema, null, defaultValue)
             }
-            val defaultValue = if (field.nullable) AvroSchema.Field.NULL_DEFAULT_VALUE else null
-            AvroSchema.Field(field.name, fieldSchema, null, defaultValue)
-        }
         return AvroSchema.createRecord(recordName, null, "com.deltaconnect", false, fields)
     }
 
     /** Convert an Avro record Schema to a Delta StructType. */
     fun toDeltaType(avroSchema: AvroSchema): DeltaType.StructType {
         require(avroSchema.type == AvroSchema.Type.RECORD) { "Expected RECORD schema, got ${avroSchema.type}" }
-        val fields = avroSchema.fields.map { field ->
-            val (deltaType, nullable) = avroFieldToDelta(field.schema())
-            StructField(
-                name = field.name(),
-                type = deltaType,
-                nullable = nullable
-            )
-        }
+        val fields =
+            avroSchema.fields.map { field ->
+                val (deltaType, nullable) = avroFieldToDelta(field.schema())
+                StructField(
+                    name = field.name(),
+                    type = deltaType,
+                    nullable = nullable,
+                )
+            }
         return DeltaType.StructType(fields)
     }
 
-    private fun deltaTypeToAvro(type: DeltaType): AvroSchema {
-        return when (type) {
+    private fun deltaTypeToAvro(type: DeltaType): AvroSchema =
+        when (type) {
             is DeltaType.StringType -> AvroSchema.create(AvroSchema.Type.STRING)
             is DeltaType.LongType -> AvroSchema.create(AvroSchema.Type.LONG)
             is DeltaType.IntegerType -> AvroSchema.create(AvroSchema.Type.INT)
@@ -59,26 +64,27 @@ object AvroToDeltaConverter {
             }
             is DeltaType.ArrayType -> {
                 val elementSchema = deltaTypeToAvro(type.elementType)
-                val itemSchema = if (type.containsNull) {
-                    AvroSchema.createUnion(AvroSchema.create(AvroSchema.Type.NULL), elementSchema)
-                } else {
-                    elementSchema
-                }
+                val itemSchema =
+                    if (type.containsNull) {
+                        AvroSchema.createUnion(AvroSchema.create(AvroSchema.Type.NULL), elementSchema)
+                    } else {
+                        elementSchema
+                    }
                 AvroSchema.createArray(itemSchema)
             }
             is DeltaType.MapType -> {
                 // Avro maps always have string keys
                 val valueSchema = deltaTypeToAvro(type.valueType)
-                val valueItemSchema = if (type.valueContainsNull) {
-                    AvroSchema.createUnion(AvroSchema.create(AvroSchema.Type.NULL), valueSchema)
-                } else {
-                    valueSchema
-                }
+                val valueItemSchema =
+                    if (type.valueContainsNull) {
+                        AvroSchema.createUnion(AvroSchema.create(AvroSchema.Type.NULL), valueSchema)
+                    } else {
+                        valueSchema
+                    }
                 AvroSchema.createMap(valueItemSchema)
             }
             is DeltaType.StructType -> toAvroSchema(type)
         }
-    }
 
     private fun avroFieldToDelta(schema: AvroSchema): Pair<DeltaType, Boolean> {
         if (schema.type == AvroSchema.Type.UNION) {

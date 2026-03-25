@@ -11,5 +11,5 @@ data class Protocol(
     val minReaderVersion: Int = 1,
     val minWriterVersion: Int = 2,
     val readerFeatures: Set<String>? = null,
-    val writerFeatures: Set<String>? = null
+    val writerFeatures: Set<String>? = null,
 ) : Action

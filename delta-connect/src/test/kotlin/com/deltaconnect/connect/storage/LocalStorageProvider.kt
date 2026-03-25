@@ -14,28 +14,20 @@ import java.nio.file.Path
  * @param basePath The root directory for the local file system store.
  */
 class LocalStorageProvider(
-    private val basePath: Path
+    private val basePath: Path,
 ) : StorageProvider {
-
     override fun schemes(): Set<String> = setOf("file")
 
-    override fun defineConfig(configDef: ConfigDef): ConfigDef {
-        return configDef
-    }
+    override fun defineConfig(configDef: ConfigDef): ConfigDef = configDef
 
-    override fun validate(props: Map<String, String>): List<String> {
-        return emptyList()
-    }
+    override fun validate(props: Map<String, String>): List<String> = emptyList()
 
-    override fun createLogStore(props: Map<String, String>): DeltaLogStore {
-        return LocalFileSystemLogStore(basePath)
-    }
+    override fun createLogStore(props: Map<String, String>): DeltaLogStore = LocalFileSystemLogStore(basePath)
 
-    override fun parseBasePath(storagePath: String): String {
-        return if (storagePath.startsWith("file://")) {
+    override fun parseBasePath(storagePath: String): String =
+        if (storagePath.startsWith("file://")) {
             storagePath.removePrefix("file://").trimEnd('/')
         } else {
             storagePath.trimEnd('/')
         }
-    }
 }

@@ -3,7 +3,6 @@ package com.deltaconnect.protocol.parquet
 import com.deltaconnect.protocol.schema.AvroToDeltaConverter
 import com.deltaconnect.protocol.schema.DeltaType
 import com.deltaconnect.protocol.storage.DeltaLogStore
-import org.apache.avro.Schema as AvroSchema
 import org.apache.avro.generic.GenericRecord
 import org.apache.parquet.avro.AvroParquetWriter
 import org.apache.parquet.hadoop.ParquetWriter
@@ -12,6 +11,7 @@ import org.apache.parquet.io.OutputFile
 import org.apache.parquet.io.PositionOutputStream
 import org.slf4j.LoggerFactory
 import java.io.OutputStream
+import org.apache.avro.Schema as AvroSchema
 
 /**
  * Writes Avro GenericRecords to a Parquet file via [DeltaLogStore].
@@ -27,7 +27,7 @@ class ParquetFileWriter(
     private val logStore: DeltaLogStore,
     private val schema: DeltaType.StructType,
     private val compression: CompressionCodecName = CompressionCodecName.SNAPPY,
-    private val rowGroupSize: Long = DEFAULT_ROW_GROUP_SIZE
+    private val rowGroupSize: Long = DEFAULT_ROW_GROUP_SIZE,
 ) {
     private val avroSchema: AvroSchema = AvroToDeltaConverter.toAvroSchema(schema)
 
@@ -43,7 +43,7 @@ class ParquetFileWriter(
         val filePath: String,
         val fileSize: Long,
         val recordCount: Long,
-        val statsJson: String
+        val statsJson: String,
     )
 
     /**
@@ -53,15 +53,20 @@ class ParquetFileWriter(
      * @param records Records to write. Must conform to [schema].
      * @return Write result including file size and column stats.
      */
-    fun write(filePath: String, records: List<GenericRecord>): WriteResult {
+    fun write(
+        filePath: String,
+        records: List<GenericRecord>,
+    ): WriteResult {
         val outputStream = logStore.createDataFile(filePath)
         val outputFile = OutputStreamBackedOutputFile(outputStream)
 
-        val writer: ParquetWriter<GenericRecord> = AvroParquetWriter.builder<GenericRecord>(outputFile)
-            .withSchema(avroSchema)
-            .withCompressionCodec(compression)
-            .withRowGroupSize(rowGroupSize)
-            .build()
+        val writer: ParquetWriter<GenericRecord> =
+            AvroParquetWriter
+                .builder<GenericRecord>(outputFile)
+                .withSchema(avroSchema)
+                .withCompressionCodec(compression)
+                .withRowGroupSize(rowGroupSize)
+                .build()
 
         val statsCollector = StatsCollector(schema)
         var count = 0L
@@ -79,14 +84,17 @@ class ParquetFileWriter(
 
         logger.info(
             "Parquet file written: path={}, records={}, size={}, compression={}",
-            filePath, count, fileSize, compression
+            filePath,
+            count,
+            fileSize,
+            compression,
         )
 
         return WriteResult(
             filePath = filePath,
             fileSize = fileSize,
             recordCount = count,
-            statsJson = statsJson
+            statsJson = statsJson,
         )
     }
 
@@ -103,8 +111,9 @@ class ParquetFileWriter(
  *
  * Tracks the number of bytes written for use in [AddFile.size].
  */
-internal class OutputStreamBackedOutputFile(private val outputStream: OutputStream) : OutputFile {
-
+internal class OutputStreamBackedOutputFile(
+    private val outputStream: OutputStream,
+) : OutputFile {
     private var positionStream: CountingPositionOutputStream? = null
 
     override fun create(blockSizeHint: Long): PositionOutputStream {
@@ -113,17 +122,15 @@ internal class OutputStreamBackedOutputFile(private val outputStream: OutputStre
         return stream
     }
 
-    override fun createOrOverwrite(blockSizeHint: Long): PositionOutputStream {
-        return create(blockSizeHint)
-    }
+    override fun createOrOverwrite(blockSizeHint: Long): PositionOutputStream = create(blockSizeHint)
 
     override fun supportsBlockSize(): Boolean = false
 
     override fun defaultBlockSize(): Long = 0
 
     fun bytesWritten(): Long {
-        return positionStream?.getPos()
-            ?: throw IllegalStateException("File not yet written")
+        check(positionStream != null) { "File not yet written" }
+        return positionStream!!.getPos()
     }
 }
 
@@ -131,9 +138,8 @@ internal class OutputStreamBackedOutputFile(private val outputStream: OutputStre
  * A [PositionOutputStream] that wraps a regular [OutputStream] and tracks position.
  */
 internal class CountingPositionOutputStream(
-    private val delegate: OutputStream
+    private val delegate: OutputStream,
 ) : PositionOutputStream() {
-
     private var position: Long = 0L
 
     override fun getPos(): Long = position
@@ -143,7 +149,11 @@ internal class CountingPositionOutputStream(
         position++
     }
 
-    override fun write(b: ByteArray, off: Int, len: Int) {
+    override fun write(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ) {
         delegate.write(b, off, len)
         position += len
     }

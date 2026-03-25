@@ -15,8 +15,9 @@ import java.nio.file.Path
  *
  * @param path Path to the local file.
  */
-class LocalRandomAccessInputFile(private val path: Path) : InputFile {
-
+class LocalRandomAccessInputFile(
+    private val path: Path,
+) : InputFile {
     private val fileLength: Long = path.toFile().length()
 
     override fun getLength(): Long = fileLength
@@ -28,9 +29,8 @@ class LocalRandomAccessInputFile(private val path: Path) : InputFile {
  * Seekable input stream backed by a [RandomAccessFile].
  */
 internal class LocalRandomAccessSeekableInputStream(
-    path: Path
+    path: Path,
 ) : SeekableInputStream() {
-
     private val raf: RandomAccessFile = RandomAccessFile(path.toFile(), "r")
 
     override fun getPos(): Long = raf.filePointer
@@ -41,13 +41,21 @@ internal class LocalRandomAccessSeekableInputStream(
 
     override fun read(): Int = raf.read()
 
-    override fun read(b: ByteArray, off: Int, len: Int): Int = raf.read(b, off, len)
+    override fun read(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ): Int = raf.read(b, off, len)
 
     override fun readFully(bytes: ByteArray) {
         raf.readFully(bytes)
     }
 
-    override fun readFully(bytes: ByteArray, start: Int, len: Int) {
+    override fun readFully(
+        bytes: ByteArray,
+        start: Int,
+        len: Int,
+    ) {
         raf.readFully(bytes, start, len)
     }
 

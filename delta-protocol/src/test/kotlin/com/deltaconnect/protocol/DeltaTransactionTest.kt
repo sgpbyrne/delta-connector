@@ -1,8 +1,6 @@
 package com.deltaconnect.protocol
 
 import com.deltaconnect.protocol.actions.ActionSerializer
-import com.deltaconnect.protocol.actions.AddFile
-import com.deltaconnect.protocol.actions.RemoveFile
 import com.deltaconnect.protocol.actions.SetTransaction
 import com.deltaconnect.protocol.log.LogTestFixtures
 import com.deltaconnect.protocol.schema.DeltaType
@@ -23,7 +21,6 @@ import java.io.OutputStream
 import java.nio.file.Path
 
 class DeltaTransactionTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -31,12 +28,13 @@ class DeltaTransactionTest {
 
     private val tablePath = "test-table"
 
-    private val simpleSchema = DeltaType.StructType(
-        listOf(
-            StructField("id", DeltaType.IntegerType, nullable = false),
-            StructField("value", DeltaType.StringType, nullable = true)
+    private val simpleSchema =
+        DeltaType.StructType(
+            listOf(
+                StructField("id", DeltaType.IntegerType, nullable = false),
+                StructField("value", DeltaType.StringType, nullable = true),
+            ),
         )
-    )
 
     @BeforeEach
     fun setUp() {
@@ -46,7 +44,6 @@ class DeltaTransactionTest {
 
     @Nested
     inner class BasicCommit {
-
         @Test
         fun `commits at next version after snapshot`() {
             val table = DeltaTable.forPath(logStore, tablePath)
@@ -116,22 +113,21 @@ class DeltaTransactionTest {
 
     @Nested
     inner class Validation {
-
         @Test
         fun `throws on empty transaction`() {
             val table = DeltaTable.forPath(logStore, tablePath)
             val txn = table.startTransaction()
 
-            val ex = assertThrows<IllegalStateException> {
-                txn.commit("WRITE")
-            }
+            val ex =
+                assertThrows<IllegalStateException> {
+                    txn.commit("WRITE")
+                }
             ex.message shouldContain "empty"
         }
     }
 
     @Nested
     inner class BlindAppendConflictRetry {
-
         @Test
         fun `retries blind append on conflict`() {
             val table = DeltaTable.forPath(logStore, tablePath)
@@ -139,10 +135,15 @@ class DeltaTransactionTest {
             val txn = table.startTransaction()
             txn.addAction(LogTestFixtures.addFile("txn-file.parquet"))
 
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.addFile("concurrent-file.parquet"),
-                LogTestFixtures.commitInfo(operation = "WRITE")
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("concurrent-file.parquet"),
+                    LogTestFixtures.commitInfo(operation = "WRITE"),
+                ),
+            )
 
             val version = txn.commit("WRITE")
             version shouldBe 2L
@@ -160,9 +161,14 @@ class DeltaTransactionTest {
             txn.addAction(LogTestFixtures.addFile("txn-file.parquet"))
 
             for (v in 1L..3L) {
-                LogTestFixtures.writeCommit(logStore, tablePath, v, listOf(
-                    LogTestFixtures.addFile("concurrent-$v.parquet")
-                ))
+                LogTestFixtures.writeCommit(
+                    logStore,
+                    tablePath,
+                    v,
+                    listOf(
+                        LogTestFixtures.addFile("concurrent-$v.parquet"),
+                    ),
+                )
             }
 
             val version = txn.commit("WRITE")
@@ -172,7 +178,6 @@ class DeltaTransactionTest {
 
     @Nested
     inner class DisjointFileConflictRetry {
-
         @Test
         fun `retries merge when concurrent commit touches different files`() {
             val table = DeltaTable.forPath(logStore, tablePath)
@@ -186,10 +191,15 @@ class DeltaTransactionTest {
             txn2.addAction(LogTestFixtures.removeFile("file-a.parquet"))
             txn2.addAction(LogTestFixtures.addFile("file-a-v2.parquet"))
 
-            LogTestFixtures.writeCommit(logStore, tablePath, 2L, listOf(
-                LogTestFixtures.removeFile("file-b.parquet"),
-                LogTestFixtures.addFile("file-b-v2.parquet")
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                2L,
+                listOf(
+                    LogTestFixtures.removeFile("file-b.parquet"),
+                    LogTestFixtures.addFile("file-b-v2.parquet"),
+                ),
+            )
 
             val version = txn2.commit("MERGE")
             version shouldBe 3L
@@ -211,9 +221,14 @@ class DeltaTransactionTest {
             txn2.addAction(LogTestFixtures.removeFile("file-a.parquet"))
             txn2.addAction(LogTestFixtures.addFile("file-a-v2.parquet"))
 
-            LogTestFixtures.writeCommit(logStore, tablePath, 2L, listOf(
-                LogTestFixtures.addFile("new-file.parquet")
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                2L,
+                listOf(
+                    LogTestFixtures.addFile("new-file.parquet"),
+                ),
+            )
 
             val version = txn2.commit("MERGE")
             version shouldBe 3L
@@ -222,7 +237,6 @@ class DeltaTransactionTest {
 
     @Nested
     inner class OverlappingFileConflict {
-
         @Test
         fun `fails when concurrent commit removes same file`() {
             val table = DeltaTable.forPath(logStore, tablePath)
@@ -235,10 +249,15 @@ class DeltaTransactionTest {
             txn2.addAction(LogTestFixtures.removeFile("file-a.parquet"))
             txn2.addAction(LogTestFixtures.addFile("file-a-v2.parquet"))
 
-            LogTestFixtures.writeCommit(logStore, tablePath, 2L, listOf(
-                LogTestFixtures.removeFile("file-a.parquet"),
-                LogTestFixtures.addFile("file-a-other.parquet")
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                2L,
+                listOf(
+                    LogTestFixtures.removeFile("file-a.parquet"),
+                    LogTestFixtures.addFile("file-a-other.parquet"),
+                ),
+            )
 
             assertThrows<CommitConflictException> {
                 txn2.commit("MERGE")
@@ -257,9 +276,14 @@ class DeltaTransactionTest {
             txn2.addAction(LogTestFixtures.removeFile("file-a.parquet"))
             txn2.addAction(LogTestFixtures.addFile("file-a-replaced.parquet"))
 
-            LogTestFixtures.writeCommit(logStore, tablePath, 2L, listOf(
-                LogTestFixtures.addFile("file-a.parquet", size = 9999L)
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                2L,
+                listOf(
+                    LogTestFixtures.addFile("file-a.parquet", size = 9999L),
+                ),
+            )
 
             assertThrows<CommitConflictException> {
                 txn2.commit("MERGE")
@@ -269,7 +293,6 @@ class DeltaTransactionTest {
 
     @Nested
     inner class MaxRetries {
-
         @Test
         fun `fails after max retries exceeded`() {
             val conflictStore = ConflictInjectingLogStore(logStore, conflictsToInject = 3)
@@ -301,9 +324,14 @@ class DeltaTransactionTest {
             val txn = table.startTransaction()
             txn.addAction(LogTestFixtures.addFile("txn-file.parquet"))
 
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.addFile("concurrent.parquet")
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("concurrent.parquet"),
+                ),
+            )
 
             assertThrows<CommitConflictException> {
                 txn.commit("WRITE", maxRetries = 0)
@@ -313,7 +341,6 @@ class DeltaTransactionTest {
 
     @Nested
     inner class TransactionWithSetTransaction {
-
         @Test
         fun `SetTransaction committed alongside data actions`() {
             val table = DeltaTable.forPath(logStore, tablePath)
@@ -333,9 +360,14 @@ class DeltaTransactionTest {
             txn.addAction(LogTestFixtures.addFile("data-001.parquet"))
             txn.addAction(SetTransaction("my-app-p0", version = 500L))
 
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.addFile("concurrent.parquet")
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("concurrent.parquet"),
+                ),
+            )
 
             val version = txn.commit("WRITE")
             version shouldBe 2L
@@ -347,7 +379,6 @@ class DeltaTransactionTest {
 
     @Nested
     inner class MultipleActions {
-
         @Test
         fun `addActions adds multiple actions at once`() {
             val table = DeltaTable.forPath(logStore, tablePath)
@@ -356,8 +387,8 @@ class DeltaTransactionTest {
                 listOf(
                     LogTestFixtures.addFile("data-001.parquet"),
                     LogTestFixtures.addFile("data-002.parquet"),
-                    LogTestFixtures.addFile("data-003.parquet")
-                )
+                    LogTestFixtures.addFile("data-003.parquet"),
+                ),
             )
             txn.commit("WRITE")
 
@@ -373,8 +404,8 @@ class DeltaTransactionTest {
             txn.addActions(
                 listOf(
                     LogTestFixtures.removeFile("data-001.parquet"),
-                    LogTestFixtures.addFile("data-002.parquet")
-                )
+                    LogTestFixtures.addFile("data-002.parquet"),
+                ),
             )
             txn.commit("MERGE")
 
@@ -386,7 +417,6 @@ class DeltaTransactionTest {
 
     @Nested
     inner class EngineInfo {
-
         @Test
         fun `default engine info is null`() {
             val table = DeltaTable.forPath(logStore, tablePath)
@@ -410,7 +440,6 @@ class DeltaTransactionTest {
 
     @Nested
     inner class CheckpointResilience {
-
         @Test
         fun `commit succeeds even when checkpoint write fails`() {
             val checkpointTable = "checkpoint-test-table"
@@ -433,55 +462,72 @@ class DeltaTransactionTest {
 
     private class ConflictInjectingLogStore(
         private val delegate: LocalFileSystemLogStore,
-        private val conflictsToInject: Int
+        private val conflictsToInject: Int,
     ) : DeltaLogStore {
-
         var writeAttempts: Int = 0
             private set
 
-        override fun writeCommit(tablePath: String, version: Long, content: ByteArray) {
+        override fun writeCommit(
+            tablePath: String,
+            version: Long,
+            content: ByteArray,
+        ) {
             writeAttempts++
             if (writeAttempts <= conflictsToInject) {
-                val competingContent = ActionSerializer.serializeActions(
-                    listOf(LogTestFixtures.addFile("conflict-$writeAttempts.parquet"))
-                ).toByteArray(Charsets.UTF_8)
+                val competingContent =
+                    ActionSerializer
+                        .serializeActions(
+                            listOf(LogTestFixtures.addFile("conflict-$writeAttempts.parquet")),
+                        ).toByteArray(Charsets.UTF_8)
                 delegate.writeCommit(tablePath, version, competingContent)
                 throw CommitConflictException(tablePath, version)
             }
             delegate.writeCommit(tablePath, version, content)
         }
 
-        override fun readCommit(tablePath: String, version: Long): ByteArray? =
-            delegate.readCommit(tablePath, version)
+        override fun readCommit(
+            tablePath: String,
+            version: Long,
+        ): ByteArray? = delegate.readCommit(tablePath, version)
 
-        override fun listCommitVersions(tablePath: String, startVersion: Long): List<Long> =
-            delegate.listCommitVersions(tablePath, startVersion)
+        override fun listCommitVersions(
+            tablePath: String,
+            startVersion: Long,
+        ): List<Long> = delegate.listCommitVersions(tablePath, startVersion)
 
-        override fun createDataFile(filePath: String): OutputStream =
-            delegate.createDataFile(filePath)
+        override fun createDataFile(filePath: String): OutputStream = delegate.createDataFile(filePath)
 
-        override fun readDataFileAsInputFile(filePath: String): org.apache.parquet.io.InputFile =
-            delegate.readDataFileAsInputFile(filePath)
+        override fun readDataFileAsInputFile(filePath: String): org.apache.parquet.io.InputFile = delegate
+            .readDataFileAsInputFile(
+                filePath,
+            )
 
-        override fun readLastCheckpoint(tablePath: String): String? =
-            delegate.readLastCheckpoint(tablePath)
+        override fun readLastCheckpoint(tablePath: String): String? = delegate.readLastCheckpoint(tablePath)
 
-        override fun writeLastCheckpoint(tablePath: String, content: String) =
-            delegate.writeLastCheckpoint(tablePath, content)
+        override fun writeLastCheckpoint(
+            tablePath: String,
+            content: String,
+        ) = delegate.writeLastCheckpoint(tablePath, content)
     }
 
     private class CheckpointFailingLogStore(
-        private val delegate: LocalFileSystemLogStore
+        private val delegate: LocalFileSystemLogStore,
     ) : DeltaLogStore {
+        override fun writeCommit(
+            tablePath: String,
+            version: Long,
+            content: ByteArray,
+        ) = delegate.writeCommit(tablePath, version, content)
 
-        override fun writeCommit(tablePath: String, version: Long, content: ByteArray) =
-            delegate.writeCommit(tablePath, version, content)
+        override fun readCommit(
+            tablePath: String,
+            version: Long,
+        ): ByteArray? = delegate.readCommit(tablePath, version)
 
-        override fun readCommit(tablePath: String, version: Long): ByteArray? =
-            delegate.readCommit(tablePath, version)
-
-        override fun listCommitVersions(tablePath: String, startVersion: Long): List<Long> =
-            delegate.listCommitVersions(tablePath, startVersion)
+        override fun listCommitVersions(
+            tablePath: String,
+            startVersion: Long,
+        ): List<Long> = delegate.listCommitVersions(tablePath, startVersion)
 
         override fun createDataFile(filePath: String): OutputStream {
             if (filePath.endsWith(".checkpoint.parquet")) {
@@ -490,13 +536,16 @@ class DeltaTransactionTest {
             return delegate.createDataFile(filePath)
         }
 
-        override fun readDataFileAsInputFile(filePath: String): org.apache.parquet.io.InputFile =
-            delegate.readDataFileAsInputFile(filePath)
+        override fun readDataFileAsInputFile(filePath: String): org.apache.parquet.io.InputFile = delegate
+            .readDataFileAsInputFile(
+                filePath,
+            )
 
-        override fun readLastCheckpoint(tablePath: String): String? =
-            delegate.readLastCheckpoint(tablePath)
+        override fun readLastCheckpoint(tablePath: String): String? = delegate.readLastCheckpoint(tablePath)
 
-        override fun writeLastCheckpoint(tablePath: String, content: String) =
-            delegate.writeLastCheckpoint(tablePath, content)
+        override fun writeLastCheckpoint(
+            tablePath: String,
+            content: String,
+        ) = delegate.writeLastCheckpoint(tablePath, content)
     }
 }

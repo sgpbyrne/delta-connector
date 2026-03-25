@@ -19,7 +19,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 class ParquetFileWriterTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -32,20 +31,21 @@ class ParquetFileWriterTest {
 
     @Nested
     inner class BasicWriteRoundTrip {
-
         @Test
         fun `writes and reads back simple records`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
-            val records = listOf(
-                GenericRecordBuilder(avroSchema).set("id", 1).set("name", "Alice").build(),
-                GenericRecordBuilder(avroSchema).set("id", 2).set("name", "Bob").build()
-            )
+            val records =
+                listOf(
+                    GenericRecordBuilder(avroSchema).set("id", 1).set("name", "Alice").build(),
+                    GenericRecordBuilder(avroSchema).set("id", 2).set("name", "Bob").build(),
+                )
 
             val writer = ParquetFileWriter(logStore, schema)
             val result = writer.write("data/part-00000.parquet", records)
@@ -64,9 +64,10 @@ class ParquetFileWriterTest {
 
         @Test
         fun `writes empty file`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("id", DeltaType.IntegerType, nullable = false)),
+                )
 
             val writer = ParquetFileWriter(logStore, schema)
             val result = writer.write("data/empty.parquet", emptyList())
@@ -80,19 +81,21 @@ class ParquetFileWriterTest {
 
         @Test
         fun `file size matches actual file on disk`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("value", DeltaType.StringType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("value", DeltaType.StringType, nullable = true),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
-            val records = (1..100).map { i ->
-                GenericRecordBuilder(avroSchema)
-                    .set("id", i)
-                    .set("value", "value-$i")
-                    .build()
-            }
+            val records =
+                (1..100).map { i ->
+                    GenericRecordBuilder(avroSchema)
+                        .set("id", i)
+                        .set("value", "value-$i")
+                        .build()
+                }
 
             val writer = ParquetFileWriter(logStore, schema)
             val result = writer.write("data/sized.parquet", records)
@@ -104,39 +107,40 @@ class ParquetFileWriterTest {
 
     @Nested
     inner class AllDeltaTypes {
-
         @Test
         fun `roundtrips all primitive types`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("col_string", DeltaType.StringType),
-                    StructField("col_long", DeltaType.LongType),
-                    StructField("col_int", DeltaType.IntegerType),
-                    StructField("col_short", DeltaType.ShortType),
-                    StructField("col_byte", DeltaType.ByteType),
-                    StructField("col_float", DeltaType.FloatType),
-                    StructField("col_double", DeltaType.DoubleType),
-                    StructField("col_boolean", DeltaType.BooleanType),
-                    StructField("col_binary", DeltaType.BinaryType),
-                    StructField("col_date", DeltaType.DateType),
-                    StructField("col_timestamp", DeltaType.TimestampType)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("col_string", DeltaType.StringType),
+                        StructField("col_long", DeltaType.LongType),
+                        StructField("col_int", DeltaType.IntegerType),
+                        StructField("col_short", DeltaType.ShortType),
+                        StructField("col_byte", DeltaType.ByteType),
+                        StructField("col_float", DeltaType.FloatType),
+                        StructField("col_double", DeltaType.DoubleType),
+                        StructField("col_boolean", DeltaType.BooleanType),
+                        StructField("col_binary", DeltaType.BinaryType),
+                        StructField("col_date", DeltaType.DateType),
+                        StructField("col_timestamp", DeltaType.TimestampType),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
 
-            val record = GenericRecordBuilder(avroSchema)
-                .set("col_string", "hello")
-                .set("col_long", 42L)
-                .set("col_int", 7)
-                .set("col_short", 3) // Avro INT
-                .set("col_byte", 1) // Avro INT
-                .set("col_float", 3.14f)
-                .set("col_double", 2.718)
-                .set("col_boolean", true)
-                .set("col_binary", ByteBuffer.wrap(byteArrayOf(0xDE.toByte(), 0xAD.toByte())))
-                .set("col_date", 19000) // epoch days
-                .set("col_timestamp", 1700000000000000L) // epoch micros
-                .build()
+            val record =
+                GenericRecordBuilder(avroSchema)
+                    .set("col_string", "hello")
+                    .set("col_long", 42L)
+                    .set("col_int", 7)
+                    .set("col_short", 3) // Avro INT
+                    .set("col_byte", 1) // Avro INT
+                    .set("col_float", 3.14f)
+                    .set("col_double", 2.718)
+                    .set("col_boolean", true)
+                    .set("col_binary", ByteBuffer.wrap(byteArrayOf(0xDE.toByte(), 0xAD.toByte())))
+                    .set("col_date", 19000) // epoch days
+                    .set("col_timestamp", 1700000000000000L) // epoch micros
+                    .build()
 
             val writer = ParquetFileWriter(logStore, schema)
             writer.write("data/all-types.parquet", listOf(record))
@@ -158,16 +162,18 @@ class ParquetFileWriterTest {
 
         @Test
         fun `roundtrips decimal type`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("amount", DeltaType.DecimalType(10, 2)))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("amount", DeltaType.DecimalType(10, 2))),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
 
             val decimal = BigDecimal("123.45")
             val bytes = decimal.unscaledValue().toByteArray()
-            val record = GenericRecordBuilder(avroSchema)
-                .set("amount", ByteBuffer.wrap(bytes))
-                .build()
+            val record =
+                GenericRecordBuilder(avroSchema)
+                    .set("amount", ByteBuffer.wrap(bytes))
+                    .build()
 
             val writer = ParquetFileWriter(logStore, schema)
             writer.write("data/decimal.parquet", listOf(record))
@@ -184,22 +190,23 @@ class ParquetFileWriterTest {
 
     @Nested
     inner class NullHandling {
-
         @Test
         fun `handles null values in nullable columns`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
 
-            val records = listOf(
-                GenericRecordBuilder(avroSchema).set("id", 1).set("name", "Alice").build(),
-                GenericRecordBuilder(avroSchema).set("id", 2).set("name", null).build(),
-                GenericRecordBuilder(avroSchema).set("id", 3).set("name", null).build()
-            )
+            val records =
+                listOf(
+                    GenericRecordBuilder(avroSchema).set("id", 1).set("name", "Alice").build(),
+                    GenericRecordBuilder(avroSchema).set("id", 2).set("name", null).build(),
+                    GenericRecordBuilder(avroSchema).set("id", 3).set("name", null).build(),
+                )
 
             val writer = ParquetFileWriter(logStore, schema)
             val result = writer.write("data/nulls.parquet", records)
@@ -216,25 +223,28 @@ class ParquetFileWriterTest {
             stats.nullCount["name"] shouldBe 2L
             stats.nullCount["id"] shouldBe 0L
         }
-
     }
 
     @Nested
     inner class Compression {
-
         @Test
         fun `supports uncompressed`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("id", DeltaType.IntegerType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
-            val records = listOf(
-                GenericRecordBuilder(avroSchema).set("id", 1).build()
-            )
+            val records =
+                listOf(
+                    GenericRecordBuilder(avroSchema).set("id", 1).build(),
+                )
 
-            val writer = ParquetFileWriter(
-                logStore, schema, compression = CompressionCodecName.UNCOMPRESSED
-            )
+            val writer =
+                ParquetFileWriter(
+                    logStore,
+                    schema,
+                    compression = CompressionCodecName.UNCOMPRESSED,
+                )
             val result = writer.write("data/uncompressed.parquet", records)
 
             result.recordCount shouldBe 1L
@@ -246,24 +256,25 @@ class ParquetFileWriterTest {
 
     @Nested
     inner class ManyRecords {
-
         @Test
         fun `handles large batch without OOM`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("value", DeltaType.StringType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("value", DeltaType.StringType, nullable = true),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
 
             val batchSize = 10_000
-            val records = (0 until batchSize).map { i ->
-                GenericRecordBuilder(avroSchema)
-                    .set("id", i)
-                    .set("value", "val-$i")
-                    .build()
-            }
+            val records =
+                (0 until batchSize).map { i ->
+                    GenericRecordBuilder(avroSchema)
+                        .set("id", i)
+                        .set("value", "val-$i")
+                        .build()
+                }
 
             val writer = ParquetFileWriter(logStore, schema)
             val result = writer.write("data/large.parquet", records)
@@ -277,9 +288,7 @@ class ParquetFileWriterTest {
         }
     }
 
-    private fun readParquetFile(filePath: String): List<GenericRecord> {
-        return ParquetFileReader(logStore).read(filePath)
-    }
+    private fun readParquetFile(filePath: String): List<GenericRecord> = ParquetFileReader(logStore).read(filePath)
 
     private fun parseStats(json: String): ParsedStats = ParsedStats.fromJson(json)
 }

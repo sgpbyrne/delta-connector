@@ -19,5 +19,5 @@ data class AddFile(
     val modificationTime: Long,
     val dataChange: Boolean,
     val stats: String? = null,
-    val tags: Map<String, String>? = null
+    val tags: Map<String, String>? = null,
 ) : Action

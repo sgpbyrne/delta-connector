@@ -10,7 +10,7 @@ import org.apache.avro.generic.GenericRecord
 enum class MergeOperation {
     INSERT,
     UPDATE,
-    DELETE
+    DELETE,
 }
 
 /**
@@ -23,13 +23,15 @@ enum class MergeOperation {
  */
 data class SourceRecord(
     val record: GenericRecord,
-    val operation: MergeOperation
+    val operation: MergeOperation,
 )
 
 /**
  * Composite merge key wrapping one or more column values.
  */
-data class MergeKey(val values: List<Any?>)
+data class MergeKey(
+    val values: List<Any?>,
+)
 
 /**
  * Source record stored in the merge index along with its ordinal position
@@ -42,7 +44,7 @@ data class MergeKey(val values: List<Any?>)
 data class IndexedSourceRecord(
     val record: GenericRecord,
     val operation: MergeOperation,
-    val ordinal: Int
+    val ordinal: Int,
 )
 
 /**
@@ -50,7 +52,7 @@ data class IndexedSourceRecord(
  */
 data class KeyBounds(
     val min: Comparable<*>,
-    val max: Comparable<*>
+    val max: Comparable<*>,
 )
 
 /**
@@ -61,7 +63,7 @@ data class KeyBounds(
  */
 data class PruneResult(
     val matchingFiles: List<AddFile>,
-    val prunedCount: Int
+    val prunedCount: Int,
 )
 
 /**
@@ -77,7 +79,7 @@ data class FileMergeResult(
     val outputRows: List<GenericRecord>,
     val updatedCount: Long,
     val deletedCount: Long,
-    val copiedCount: Long
+    val copiedCount: Long,
 )
 
 /**
@@ -103,5 +105,5 @@ data class MergeResult(
     val recordsCopied: Long,
     val filesRewritten: Int,
     val filesCreated: Int,
-    val filesSkipped: Int
+    val filesSkipped: Int,
 )

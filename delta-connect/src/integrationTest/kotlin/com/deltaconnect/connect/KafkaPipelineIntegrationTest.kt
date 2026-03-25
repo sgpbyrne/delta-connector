@@ -7,41 +7,36 @@ import com.deltaconnect.protocol.parquet.ParquetFileReader
 import com.deltaconnect.protocol.schema.DeltaSchema
 import com.deltaconnect.protocol.storage.LocalFileSystemLogStore
 import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.CapturingSlot
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
-import org.apache.kafka.connect.errors.ConnectException
-import org.apache.kafka.connect.sink.ErrantRecordReporter
-import org.junit.jupiter.api.assertThrows
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Future
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.clients.producer.KafkaProducer
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.kafka.connect.data.Schema
 import org.apache.kafka.connect.data.SchemaBuilder
 import org.apache.kafka.connect.data.Struct
+import org.apache.kafka.connect.errors.ConnectException
 import org.apache.kafka.connect.sink.SinkRecord
 import org.apache.kafka.connect.sink.SinkTaskContext
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
-import org.testcontainers.kafka.KafkaContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.kafka.KafkaContainer
 import java.nio.file.Path
-import java.util.Properties
-import org.apache.kafka.clients.producer.KafkaProducer
-import org.apache.kafka.clients.producer.ProducerRecord
-import org.apache.kafka.clients.consumer.KafkaConsumer
-import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.kafka.common.serialization.StringSerializer
 import java.time.Duration
+import java.util.Properties
 
 /**
  * Integration tests verifying the connector pipeline with a real Kafka broker.
@@ -57,7 +52,6 @@ import java.time.Duration
  */
 @Testcontainers
 class KafkaPipelineIntegrationTest {
-
     companion object {
         @Container
         @JvmStatic
@@ -84,7 +78,6 @@ class KafkaPipelineIntegrationTest {
 
     @Nested
     inner class KafkaConnectivity {
-
         @Test
         fun `produce and consume records through real Kafka`() {
             val topic = "test-connectivity-${System.nanoTime()}"
@@ -103,35 +96,43 @@ class KafkaPipelineIntegrationTest {
 
     @Nested
     inner class FullPipeline {
+        private val dataSchema: Schema =
+            SchemaBuilder
+                .struct()
+                .field("id", Schema.INT32_SCHEMA)
+                .field("name", Schema.OPTIONAL_STRING_SCHEMA)
+                .field("value", Schema.OPTIONAL_INT32_SCHEMA)
+                .optional()
+                .build()
 
-        private val dataSchema: Schema = SchemaBuilder.struct()
-            .field("id", Schema.INT32_SCHEMA)
-            .field("name", Schema.OPTIONAL_STRING_SCHEMA)
-            .field("value", Schema.OPTIONAL_INT32_SCHEMA)
-            .optional()
-            .build()
-
-        private val envelopeSchema: Schema = SchemaBuilder.struct()
-            .field("before", dataSchema)
-            .field("after", dataSchema)
-            .field("op", Schema.STRING_SCHEMA)
-            .field("ts_ms", Schema.INT64_SCHEMA)
-            .build()
+        private val envelopeSchema: Schema =
+            SchemaBuilder
+                .struct()
+                .field("before", dataSchema)
+                .field("after", dataSchema)
+                .field("op", Schema.STRING_SCHEMA)
+                .field("ts_ms", Schema.INT64_SCHEMA)
+                .build()
 
         @Test
         fun `CDC records through task produce correct Delta output`() {
             val topic = "orders-${System.nanoTime()}"
 
-            val records = (1..5).map { i ->
-                val after = Struct(dataSchema)
-                    .put("id", i).put("name", "user_$i").put("value", i * 100)
-                val envelope = Struct(envelopeSchema)
-                    .put("before", null as Struct?)
-                    .put("after", after)
-                    .put("op", "c")
-                    .put("ts_ms", System.currentTimeMillis())
-                SinkRecord(topic, 0, null, null, envelopeSchema, envelope, i.toLong())
-            }
+            val records =
+                (1..5).map { i ->
+                    val after =
+                        Struct(dataSchema)
+                            .put("id", i)
+                            .put("name", "user_$i")
+                            .put("value", i * 100)
+                    val envelope =
+                        Struct(envelopeSchema)
+                            .put("before", null as Struct?)
+                            .put("after", after)
+                            .put("op", "c")
+                            .put("ts_ms", System.currentTimeMillis())
+                    SinkRecord(topic, 0, null, null, envelopeSchema, envelope, i.toLong())
+                }
 
             val mockContext = mockk<SinkTaskContext>(relaxed = true)
             val task = DeltaSinkTask()
@@ -144,8 +145,8 @@ class KafkaPipelineIntegrationTest {
                     DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
                     DeltaSinkConfig.DELTA_WRITE_MODE to "cdc",
                     DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-                )
+                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+                ),
             )
             task.open(listOf(TopicPartition(topic, 0)))
             task.put(records)
@@ -154,7 +155,7 @@ class KafkaPipelineIntegrationTest {
             task.preCommit(emptyMap())
             task.stop()
 
-            val tablePath = "${tempDir}/$topic"
+            val tablePath = "$tempDir/$topic"
             val table = DeltaTable.forPath(logStore, tablePath)
             val snapshot = table.snapshot()
             snapshot.version shouldBe 1L
@@ -169,10 +170,12 @@ class KafkaPipelineIntegrationTest {
         fun `append mode records through task produce separate files`() {
             val topic = "events-${System.nanoTime()}"
 
-            val plainSchema: Schema = SchemaBuilder.struct()
-                .field("id", Schema.INT32_SCHEMA)
-                .field("name", Schema.OPTIONAL_STRING_SCHEMA)
-                .build()
+            val plainSchema: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("id", Schema.INT32_SCHEMA)
+                    .field("name", Schema.OPTIONAL_STRING_SCHEMA)
+                    .build()
 
             val mockContext = mockk<SinkTaskContext>(relaxed = true)
             val task = DeltaSinkTask()
@@ -185,29 +188,31 @@ class KafkaPipelineIntegrationTest {
                     DeltaSinkConfig.DELTA_MERGE_KEYS to "",
                     DeltaSinkConfig.DELTA_WRITE_MODE to "append",
                     DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-                )
+                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+                ),
             )
             task.open(listOf(TopicPartition(topic, 0)))
 
-            val batch1 = (1..3).map { i ->
-                val value = Struct(plainSchema).put("id", i).put("name", "event_$i")
-                SinkRecord(topic, 0, null, null, plainSchema, value, i.toLong())
-            }
+            val batch1 =
+                (1..3).map { i ->
+                    val value = Struct(plainSchema).put("id", i).put("name", "event_$i")
+                    SinkRecord(topic, 0, null, null, plainSchema, value, i.toLong())
+                }
             task.put(batch1)
             currentTime += 120_000L
             task.preCommit(emptyMap())
 
-            val batch2 = (4..6).map { i ->
-                val value = Struct(plainSchema).put("id", i).put("name", "event_$i")
-                SinkRecord(topic, 0, null, null, plainSchema, value, i.toLong())
-            }
+            val batch2 =
+                (4..6).map { i ->
+                    val value = Struct(plainSchema).put("id", i).put("name", "event_$i")
+                    SinkRecord(topic, 0, null, null, plainSchema, value, i.toLong())
+                }
             task.put(batch2)
             currentTime += 120_000L
             task.preCommit(emptyMap())
             task.stop()
 
-            val tablePath = "${tempDir}/$topic"
+            val tablePath = "$tempDir/$topic"
             val snapshot = DeltaTable.forPath(logStore, tablePath).snapshot()
             snapshot.version shouldBe 2L
             snapshot.activeFiles shouldHaveSize 2
@@ -229,22 +234,27 @@ class KafkaPipelineIntegrationTest {
             task1.start(cdcProps(topic))
             task1.open(listOf(TopicPartition(topic, 0)))
 
-            val records = (1..3).map { i ->
-                val after = Struct(dataSchema)
-                    .put("id", i).put("name", "user_$i").put("value", i * 100)
-                val envelope = Struct(envelopeSchema)
-                    .put("before", null as Struct?)
-                    .put("after", after)
-                    .put("op", "c")
-                    .put("ts_ms", System.currentTimeMillis())
-                SinkRecord(topic, 0, null, null, envelopeSchema, envelope, i.toLong())
-            }
+            val records =
+                (1..3).map { i ->
+                    val after =
+                        Struct(dataSchema)
+                            .put("id", i)
+                            .put("name", "user_$i")
+                            .put("value", i * 100)
+                    val envelope =
+                        Struct(envelopeSchema)
+                            .put("before", null as Struct?)
+                            .put("after", after)
+                            .put("op", "c")
+                            .put("ts_ms", System.currentTimeMillis())
+                    SinkRecord(topic, 0, null, null, envelopeSchema, envelope, i.toLong())
+                }
             task1.put(records)
             currentTime += 120_000L
             task1.preCommit(emptyMap())
             task1.stop()
 
-            val tablePath = "${tempDir}/$topic"
+            val tablePath = "$tempDir/$topic"
             val snapshot = DeltaTable.forPath(logStore, tablePath).snapshot()
             val appId = TableWriter.makeAppId(TopicPartition(topic, 0))
             snapshot.transactions[appId]!!.version shouldBe 3L
@@ -268,21 +278,24 @@ class KafkaPipelineIntegrationTest {
 
     @Nested
     inner class SchemaEvolutionPipeline {
-
         @Test
         fun `new nullable column is added to Delta table when schema evolves`() {
             val topic = "schema-evo-${System.nanoTime()}"
 
-            val schemaV1: Schema = SchemaBuilder.struct()
-                .field("id", Schema.INT32_SCHEMA)
-                .field("name", Schema.OPTIONAL_STRING_SCHEMA)
-                .build()
+            val schemaV1: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("id", Schema.INT32_SCHEMA)
+                    .field("name", Schema.OPTIONAL_STRING_SCHEMA)
+                    .build()
 
-            val schemaV2: Schema = SchemaBuilder.struct()
-                .field("id", Schema.INT32_SCHEMA)
-                .field("name", Schema.OPTIONAL_STRING_SCHEMA)
-                .field("email", Schema.OPTIONAL_STRING_SCHEMA)
-                .build()
+            val schemaV2: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("id", Schema.INT32_SCHEMA)
+                    .field("name", Schema.OPTIONAL_STRING_SCHEMA)
+                    .field("email", Schema.OPTIONAL_STRING_SCHEMA)
+                    .build()
 
             val mockContext = mockk<SinkTaskContext>(relaxed = true)
             val task = DeltaSinkTask()
@@ -296,32 +309,37 @@ class KafkaPipelineIntegrationTest {
                     DeltaSinkConfig.DELTA_WRITE_MODE to "append",
                     DeltaSinkConfig.DELTA_SCHEMA_EVOLUTION to "true",
                     DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-                )
+                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+                ),
             )
             task.open(listOf(TopicPartition(topic, 0)))
 
             // Batch 1: schema v1
-            val batch1 = (1..3).map { i ->
-                val value = Struct(schemaV1).put("id", i).put("name", "user_$i")
-                SinkRecord(topic, 0, null, null, schemaV1, value, i.toLong())
-            }
+            val batch1 =
+                (1..3).map { i ->
+                    val value = Struct(schemaV1).put("id", i).put("name", "user_$i")
+                    SinkRecord(topic, 0, null, null, schemaV1, value, i.toLong())
+                }
             task.put(batch1)
             currentTime += 120_000L
             task.preCommit(emptyMap())
 
             // Batch 2: schema v2 with new "email" column
-            val batch2 = (4..6).map { i ->
-                val value = Struct(schemaV2)
-                    .put("id", i).put("name", "user_$i").put("email", "user_$i@test.com")
-                SinkRecord(topic, 0, null, null, schemaV2, value, (i + 3).toLong())
-            }
+            val batch2 =
+                (4..6).map { i ->
+                    val value =
+                        Struct(schemaV2)
+                            .put("id", i)
+                            .put("name", "user_$i")
+                            .put("email", "user_$i@test.com")
+                    SinkRecord(topic, 0, null, null, schemaV2, value, (i + 3).toLong())
+                }
             task.put(batch2)
             currentTime += 120_000L
             task.preCommit(emptyMap())
             task.stop()
 
-            val tablePath = "${tempDir}/$topic"
+            val tablePath = "$tempDir/$topic"
             val snapshot = DeltaTable.forPath(logStore, tablePath).snapshot()
 
             // Schema should now include "email"
@@ -334,9 +352,10 @@ class KafkaPipelineIntegrationTest {
             allRows shouldHaveSize 6
 
             // v2 rows should have email populated
-            val v2Rows = allRows.filter { rec ->
-                rec.schema.getField("email") != null && rec.get("email") != null
-            }
+            val v2Rows =
+                allRows.filter { rec ->
+                    rec.schema.getField("email") != null && rec.get("email") != null
+                }
             v2Rows shouldHaveSize 3
             v2Rows.first().get("email").toString() shouldContain "@test.com"
         }
@@ -345,32 +364,40 @@ class KafkaPipelineIntegrationTest {
         fun `schema evolution in CDC mode adds column and merges correctly`() {
             val topic = "schema-evo-cdc-${System.nanoTime()}"
 
-            val dataSchemaV1: Schema = SchemaBuilder.struct()
-                .field("id", Schema.INT32_SCHEMA)
-                .field("name", Schema.OPTIONAL_STRING_SCHEMA)
-                .optional()
-                .build()
+            val dataSchemaV1: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("id", Schema.INT32_SCHEMA)
+                    .field("name", Schema.OPTIONAL_STRING_SCHEMA)
+                    .optional()
+                    .build()
 
-            val dataSchemaV2: Schema = SchemaBuilder.struct()
-                .field("id", Schema.INT32_SCHEMA)
-                .field("name", Schema.OPTIONAL_STRING_SCHEMA)
-                .field("score", Schema.OPTIONAL_INT32_SCHEMA)
-                .optional()
-                .build()
+            val dataSchemaV2: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("id", Schema.INT32_SCHEMA)
+                    .field("name", Schema.OPTIONAL_STRING_SCHEMA)
+                    .field("score", Schema.OPTIONAL_INT32_SCHEMA)
+                    .optional()
+                    .build()
 
-            val envelopeV1: Schema = SchemaBuilder.struct()
-                .field("before", dataSchemaV1)
-                .field("after", dataSchemaV1)
-                .field("op", Schema.STRING_SCHEMA)
-                .field("ts_ms", Schema.INT64_SCHEMA)
-                .build()
+            val envelopeV1: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("before", dataSchemaV1)
+                    .field("after", dataSchemaV1)
+                    .field("op", Schema.STRING_SCHEMA)
+                    .field("ts_ms", Schema.INT64_SCHEMA)
+                    .build()
 
-            val envelopeV2: Schema = SchemaBuilder.struct()
-                .field("before", dataSchemaV2)
-                .field("after", dataSchemaV2)
-                .field("op", Schema.STRING_SCHEMA)
-                .field("ts_ms", Schema.INT64_SCHEMA)
-                .build()
+            val envelopeV2: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("before", dataSchemaV2)
+                    .field("after", dataSchemaV2)
+                    .field("op", Schema.STRING_SCHEMA)
+                    .field("ts_ms", Schema.INT64_SCHEMA)
+                    .build()
 
             val mockContext = mockk<SinkTaskContext>(relaxed = true)
             val task = DeltaSinkTask()
@@ -384,39 +411,42 @@ class KafkaPipelineIntegrationTest {
                     DeltaSinkConfig.DELTA_WRITE_MODE to "cdc",
                     DeltaSinkConfig.DELTA_SCHEMA_EVOLUTION to "true",
                     DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-                )
+                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+                ),
             )
             task.open(listOf(TopicPartition(topic, 0)))
 
             // Insert with v1 schema
-            val inserts = (1..3).map { i ->
-                val after = Struct(dataSchemaV1).put("id", i).put("name", "user_$i")
-                val envelope = Struct(envelopeV1)
-                    .put("before", null as Struct?)
-                    .put("after", after)
-                    .put("op", "c")
-                    .put("ts_ms", System.currentTimeMillis())
-                SinkRecord(topic, 0, null, null, envelopeV1, envelope, i.toLong())
-            }
+            val inserts =
+                (1..3).map { i ->
+                    val after = Struct(dataSchemaV1).put("id", i).put("name", "user_$i")
+                    val envelope =
+                        Struct(envelopeV1)
+                            .put("before", null as Struct?)
+                            .put("after", after)
+                            .put("op", "c")
+                            .put("ts_ms", System.currentTimeMillis())
+                    SinkRecord(topic, 0, null, null, envelopeV1, envelope, i.toLong())
+                }
             task.put(inserts)
             currentTime += 120_000L
             task.preCommit(emptyMap())
 
             // Update with v2 schema (adds "score" column)
             val after = Struct(dataSchemaV2).put("id", 2).put("name", "updated_2").put("score", 99)
-            val envelope = Struct(envelopeV2)
-                .put("before", null as Struct?)
-                .put("after", after)
-                .put("op", "u")
-                .put("ts_ms", System.currentTimeMillis())
+            val envelope =
+                Struct(envelopeV2)
+                    .put("before", null as Struct?)
+                    .put("after", after)
+                    .put("op", "u")
+                    .put("ts_ms", System.currentTimeMillis())
             val update = SinkRecord(topic, 0, null, null, envelopeV2, envelope, 10L)
             task.put(listOf(update))
             currentTime += 120_000L
             task.preCommit(emptyMap())
             task.stop()
 
-            val tablePath = "${tempDir}/$topic"
+            val tablePath = "$tempDir/$topic"
             val snapshot = DeltaTable.forPath(logStore, tablePath).snapshot()
 
             val reader = ParquetFileReader(logStore)
@@ -437,16 +467,20 @@ class KafkaPipelineIntegrationTest {
         fun `incompatible schema change throws when DLQ not configured`() {
             val topic = "schema-incompat-${System.nanoTime()}"
 
-            val schemaV1: Schema = SchemaBuilder.struct()
-                .field("id", Schema.INT32_SCHEMA)
-                .field("name", Schema.OPTIONAL_STRING_SCHEMA)
-                .build()
+            val schemaV1: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("id", Schema.INT32_SCHEMA)
+                    .field("name", Schema.OPTIONAL_STRING_SCHEMA)
+                    .build()
 
             // Incompatible: "name" changed from STRING to INT
-            val schemaIncompat: Schema = SchemaBuilder.struct()
-                .field("id", Schema.INT32_SCHEMA)
-                .field("name", Schema.OPTIONAL_INT32_SCHEMA)
-                .build()
+            val schemaIncompat: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("id", Schema.INT32_SCHEMA)
+                    .field("name", Schema.OPTIONAL_INT32_SCHEMA)
+                    .build()
 
             val mockContext = mockk<SinkTaskContext>(relaxed = true)
             every { mockContext.errantRecordReporter() } throws NoSuchMethodError()
@@ -462,57 +496,77 @@ class KafkaPipelineIntegrationTest {
                     DeltaSinkConfig.DELTA_WRITE_MODE to "append",
                     DeltaSinkConfig.DELTA_SCHEMA_EVOLUTION to "true",
                     DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-                )
+                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+                ),
             )
             task.open(listOf(TopicPartition(topic, 0)))
 
             // First batch creates the table
-            val batch1 = listOf(
-                SinkRecord(topic, 0, null, null, schemaV1,
-                    Struct(schemaV1).put("id", 1).put("name", "user_1"), 0L)
-            )
+            val batch1 =
+                listOf(
+                    SinkRecord(
+                        topic,
+                        0,
+                        null,
+                        null,
+                        schemaV1,
+                        Struct(schemaV1).put("id", 1).put("name", "user_1"),
+                        0L,
+                    ),
+                )
             task.put(batch1)
             currentTime += 120_000L
             task.preCommit(emptyMap())
 
             // Second batch with incompatible schema should fail on flush
-            val batch2 = listOf(
-                SinkRecord(topic, 0, null, null, schemaIncompat,
-                    Struct(schemaIncompat).put("id", 2).put("name", 42), 1L)
-            )
+            val batch2 =
+                listOf(
+                    SinkRecord(
+                        topic,
+                        0,
+                        null,
+                        null,
+                        schemaIncompat,
+                        Struct(schemaIncompat).put("id", 2).put("name", 42),
+                        1L,
+                    ),
+                )
             task.put(batch2)
             currentTime += 120_000L
 
-            val ex = assertThrows<ConnectException> {
-                // Flush happens in preCommit or stop — either can throw
-                try {
-                    task.preCommit(emptyMap())
-                } finally {
-                    task.stop()
+            val ex =
+                assertThrows<ConnectException> {
+                    // Flush happens in preCommit or stop — either can throw
+                    try {
+                        task.preCommit(emptyMap())
+                    } finally {
+                        task.stop()
+                    }
                 }
-            }
             ex.message shouldContain "Incompatible"
         }
     }
 
     @Nested
     inner class MultiTopicPipeline {
-
         @Test
         fun `two topics write to separate Delta tables in same task`() {
             val topicA = "orders-${System.nanoTime()}"
             val topicB = "events-${System.nanoTime()}"
 
-            val schemaA: Schema = SchemaBuilder.struct()
-                .field("order_id", Schema.INT32_SCHEMA)
-                .field("amount", Schema.OPTIONAL_INT32_SCHEMA)
-                .build()
+            val schemaA: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("order_id", Schema.INT32_SCHEMA)
+                    .field("amount", Schema.OPTIONAL_INT32_SCHEMA)
+                    .build()
 
-            val schemaB: Schema = SchemaBuilder.struct()
-                .field("event_id", Schema.INT32_SCHEMA)
-                .field("type", Schema.OPTIONAL_STRING_SCHEMA)
-                .build()
+            val schemaB: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("event_id", Schema.INT32_SCHEMA)
+                    .field("type", Schema.OPTIONAL_STRING_SCHEMA)
+                    .build()
 
             val mockContext = mockk<SinkTaskContext>(relaxed = true)
             val task = DeltaSinkTask()
@@ -525,32 +579,63 @@ class KafkaPipelineIntegrationTest {
                     DeltaSinkConfig.DELTA_MERGE_KEYS to "",
                     DeltaSinkConfig.DELTA_WRITE_MODE to "append",
                     DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-                )
+                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+                ),
             )
-            task.open(listOf(
-                TopicPartition(topicA, 0),
-                TopicPartition(topicB, 0)
-            ))
+            task.open(
+                listOf(
+                    TopicPartition(topicA, 0),
+                    TopicPartition(topicB, 0),
+                ),
+            )
 
             // Interleaved records from both topics in a single put()
-            val records = listOf(
-                SinkRecord(topicA, 0, null, null, schemaA,
-                    Struct(schemaA).put("order_id", 1).put("amount", 100), 0L),
-                SinkRecord(topicB, 0, null, null, schemaB,
-                    Struct(schemaB).put("event_id", 1).put("type", "click"), 0L),
-                SinkRecord(topicA, 0, null, null, schemaA,
-                    Struct(schemaA).put("order_id", 2).put("amount", 200), 1L),
-                SinkRecord(topicB, 0, null, null, schemaB,
-                    Struct(schemaB).put("event_id", 2).put("type", "view"), 1L),
-            )
+            val records =
+                listOf(
+                    SinkRecord(
+                        topicA,
+                        0,
+                        null,
+                        null,
+                        schemaA,
+                        Struct(schemaA).put("order_id", 1).put("amount", 100),
+                        0L,
+                    ),
+                    SinkRecord(
+                        topicB,
+                        0,
+                        null,
+                        null,
+                        schemaB,
+                        Struct(schemaB).put("event_id", 1).put("type", "click"),
+                        0L,
+                    ),
+                    SinkRecord(
+                        topicA,
+                        0,
+                        null,
+                        null,
+                        schemaA,
+                        Struct(schemaA).put("order_id", 2).put("amount", 200),
+                        1L,
+                    ),
+                    SinkRecord(
+                        topicB,
+                        0,
+                        null,
+                        null,
+                        schemaB,
+                        Struct(schemaB).put("event_id", 2).put("type", "view"),
+                        1L,
+                    ),
+                )
             task.put(records)
             currentTime += 120_000L
             task.preCommit(emptyMap())
             task.stop()
 
             // Verify table A
-            val tableA = DeltaTable.forPath(logStore, "${tempDir}/$topicA")
+            val tableA = DeltaTable.forPath(logStore, "$tempDir/$topicA")
             val snapshotA = tableA.snapshot()
             val reader = ParquetFileReader(logStore)
             val rowsA = snapshotA.activeFiles.flatMap { reader.read(it.path) }
@@ -558,7 +643,7 @@ class KafkaPipelineIntegrationTest {
             rowsA.map { it.get("order_id") as Int }.sorted() shouldBe listOf(1, 2)
 
             // Verify table B
-            val tableB = DeltaTable.forPath(logStore, "${tempDir}/$topicB")
+            val tableB = DeltaTable.forPath(logStore, "$tempDir/$topicB")
             val snapshotB = tableB.snapshot()
             val rowsB = snapshotB.activeFiles.flatMap { reader.read(it.path) }
             rowsB shouldHaveSize 2
@@ -571,23 +656,29 @@ class KafkaPipelineIntegrationTest {
             val topicAppend = "append-logs-${System.nanoTime()}"
 
             // CDC topic uses envelope schema
-            val dataSchema: Schema = SchemaBuilder.struct()
-                .field("id", Schema.INT32_SCHEMA)
-                .field("name", Schema.OPTIONAL_STRING_SCHEMA)
-                .optional()
-                .build()
+            val dataSchema: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("id", Schema.INT32_SCHEMA)
+                    .field("name", Schema.OPTIONAL_STRING_SCHEMA)
+                    .optional()
+                    .build()
 
-            val envelopeSchema: Schema = SchemaBuilder.struct()
-                .field("before", dataSchema)
-                .field("after", dataSchema)
-                .field("op", Schema.STRING_SCHEMA)
-                .field("ts_ms", Schema.INT64_SCHEMA)
-                .build()
+            val envelopeSchema: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("before", dataSchema)
+                    .field("after", dataSchema)
+                    .field("op", Schema.STRING_SCHEMA)
+                    .field("ts_ms", Schema.INT64_SCHEMA)
+                    .build()
 
-            val plainSchema: Schema = SchemaBuilder.struct()
-                .field("log_id", Schema.INT32_SCHEMA)
-                .field("message", Schema.OPTIONAL_STRING_SCHEMA)
-                .build()
+            val plainSchema: Schema =
+                SchemaBuilder
+                    .struct()
+                    .field("log_id", Schema.INT32_SCHEMA)
+                    .field("message", Schema.OPTIONAL_STRING_SCHEMA)
+                    .build()
 
             // Note: task-level write mode is CDC; plain schema records
             // without envelope will go through as-is in append fallback
@@ -602,27 +693,29 @@ class KafkaPipelineIntegrationTest {
                     DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
                     DeltaSinkConfig.DELTA_WRITE_MODE to "cdc",
                     DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-                )
+                    DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+                ),
             )
             task.open(listOf(TopicPartition(topicCdc, 0)))
 
             // CDC insert records
-            val cdcRecords = (1..3).map { i ->
-                val after = Struct(dataSchema).put("id", i).put("name", "user_$i")
-                val envelope = Struct(envelopeSchema)
-                    .put("before", null as Struct?)
-                    .put("after", after)
-                    .put("op", "c")
-                    .put("ts_ms", System.currentTimeMillis())
-                SinkRecord(topicCdc, 0, null, null, envelopeSchema, envelope, i.toLong())
-            }
+            val cdcRecords =
+                (1..3).map { i ->
+                    val after = Struct(dataSchema).put("id", i).put("name", "user_$i")
+                    val envelope =
+                        Struct(envelopeSchema)
+                            .put("before", null as Struct?)
+                            .put("after", after)
+                            .put("op", "c")
+                            .put("ts_ms", System.currentTimeMillis())
+                    SinkRecord(topicCdc, 0, null, null, envelopeSchema, envelope, i.toLong())
+                }
             task.put(cdcRecords)
             currentTime += 120_000L
             task.preCommit(emptyMap())
             task.stop()
 
-            val tablePath = "${tempDir}/$topicCdc"
+            val tablePath = "$tempDir/$topicCdc"
             val snapshot = DeltaTable.forPath(logStore, tablePath).snapshot()
             val reader = ParquetFileReader(logStore)
             val rows = snapshot.activeFiles.flatMap { reader.read(it.path) }
@@ -632,30 +725,33 @@ class KafkaPipelineIntegrationTest {
     }
 
     private fun createProducer(): KafkaProducer<String, String> {
-        val props = Properties().apply {
-            put("bootstrap.servers", kafka.bootstrapServers)
-            put("key.serializer", StringSerializer::class.java.name)
-            put("value.serializer", StringSerializer::class.java.name)
-        }
+        val props =
+            Properties().apply {
+                put("bootstrap.servers", kafka.bootstrapServers)
+                put("key.serializer", StringSerializer::class.java.name)
+                put("value.serializer", StringSerializer::class.java.name)
+            }
         return KafkaProducer(props)
     }
 
     private fun createConsumer(topic: String): KafkaConsumer<String, String> {
-        val props = Properties().apply {
-            put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.bootstrapServers)
-            put(ConsumerConfig.GROUP_ID_CONFIG, "test-${System.nanoTime()}")
-            put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer::class.java.name)
-            put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer::class.java.name)
-            put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
-        }
+        val props =
+            Properties().apply {
+                put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.bootstrapServers)
+                put(ConsumerConfig.GROUP_ID_CONFIG, "test-${System.nanoTime()}")
+                put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer::class.java.name)
+                put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer::class.java.name)
+                put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
+            }
         return KafkaConsumer<String, String>(props).apply { subscribe(listOf(topic)) }
     }
 
-    private fun cdcProps(topic: String): Map<String, String> = mapOf(
-        DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
-        DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
-        DeltaSinkConfig.DELTA_WRITE_MODE to "cdc",
-        DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-        DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-    )
+    private fun cdcProps(topic: String): Map<String, String> =
+        mapOf(
+            DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
+            DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
+            DeltaSinkConfig.DELTA_WRITE_MODE to "cdc",
+            DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
+            DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+        )
 }

@@ -26,20 +26,20 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class DeltaMergeEngineTest {
-
     @TempDir
     lateinit var tempDir: Path
 
     private lateinit var logStore: LocalFileSystemLogStore
     private lateinit var reader: ParquetFileReader
 
-    private val schema = DeltaType.StructType(
-        listOf(
-            StructField("id", DeltaType.IntegerType, nullable = false),
-            StructField("name", DeltaType.StringType, nullable = true),
-            StructField("value", DeltaType.IntegerType, nullable = true)
+    private val schema =
+        DeltaType.StructType(
+            listOf(
+                StructField("id", DeltaType.IntegerType, nullable = false),
+                StructField("name", DeltaType.StringType, nullable = true),
+                StructField("value", DeltaType.IntegerType, nullable = true),
+            ),
         )
-    )
     private val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
     private val tablePath = "test-table"
     private val mergeKeyNames = listOf("id")
@@ -50,7 +50,11 @@ class DeltaMergeEngineTest {
         reader = ParquetFileReader(logStore)
     }
 
-    private fun record(id: Int, name: String?, value: Int? = null): GenericRecord =
+    private fun record(
+        id: Int,
+        name: String?,
+        value: Int? = null,
+    ): GenericRecord =
         GenericRecordBuilder(avroSchema)
             .set("id", id)
             .set("name", name)
@@ -61,12 +65,12 @@ class DeltaMergeEngineTest {
         id: Int,
         name: String?,
         value: Int? = null,
-        op: MergeOperation
+        op: MergeOperation,
     ): SourceRecord = SourceRecord(record(id, name, value), op)
 
     private fun writeDataFile(
         path: String,
-        records: List<GenericRecord>
+        records: List<GenericRecord>,
     ): AddFile {
         val writer = ParquetFileWriter(logStore, schema)
         val result = writer.write(path, records)
@@ -75,46 +79,46 @@ class DeltaMergeEngineTest {
             size = result.fileSize,
             modificationTime = System.currentTimeMillis(),
             dataChange = true,
-            stats = result.statsJson
+            stats = result.statsJson,
         )
     }
 
-    private fun snapshot(vararg files: AddFile): DeltaSnapshot = DeltaSnapshot(
-        version = 0L,
-        activeFiles = files.toSet(),
-        metaData = MetaData(
-            id = "test",
-            format = Format(),
-            schemaString = DeltaSchema.toJson(schema)
-        ),
-        protocol = Protocol(),
-        transactions = emptyMap(),
-        commitInfo = null
-    )
+    private fun snapshot(vararg files: AddFile): DeltaSnapshot =
+        DeltaSnapshot(
+            version = 0L,
+            activeFiles = files.toSet(),
+            metaData =
+                MetaData(
+                    id = "test",
+                    format = Format(),
+                    schemaString = DeltaSchema.toJson(schema),
+                ),
+            protocol = Protocol(),
+            transactions = emptyMap(),
+            commitInfo = null,
+        )
 
-    private fun engine(): DeltaMergeEngine =
-        DeltaMergeEngine(logStore, schema, mergeKeyNames, tablePath)
+    private fun engine(): DeltaMergeEngine = DeltaMergeEngine(logStore, schema, mergeKeyNames, tablePath)
 
-    private fun readRecords(addFile: AddFile): List<GenericRecord> =
-        reader.read(addFile.path)
+    private fun readRecords(addFile: AddFile): List<GenericRecord> = reader.read(addFile.path)
 
-    private fun extractIds(records: List<GenericRecord>): List<Int> =
-        records.map { it.get("id") as Int }
+    private fun extractIds(records: List<GenericRecord>): List<Int> = records.map { it.get("id") as Int }
 
     @Nested
     inner class InsertOnly {
-
         @Test
         fun `all new keys inserted into new file`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"), record(2, "Bob"), record(3, "Charlie"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice"), record(2, "Bob"), record(3, "Charlie")),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(4, "Dave", op = MergeOperation.INSERT),
-                sourceRecord(5, "Elsa", op = MergeOperation.INSERT)
-            )
+            val source =
+                listOf(
+                    sourceRecord(4, "Dave", op = MergeOperation.INSERT),
+                    sourceRecord(5, "Elsa", op = MergeOperation.INSERT),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -131,10 +135,11 @@ class DeltaMergeEngineTest {
         @Test
         fun `insert into empty table`() {
             val snap = snapshot()
-            val source = listOf(
-                sourceRecord(1, "Alice", op = MergeOperation.INSERT),
-                sourceRecord(2, "Bob", op = MergeOperation.INSERT)
-            )
+            val source =
+                listOf(
+                    sourceRecord(1, "Alice", op = MergeOperation.INSERT),
+                    sourceRecord(2, "Bob", op = MergeOperation.INSERT),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -148,18 +153,19 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class UpdateOnly {
-
         @Test
         fun `all existing keys updated`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"), record(2, "Bob"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice"), record(2, "Bob")),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(1, "ALICE", op = MergeOperation.UPDATE),
-                sourceRecord(2, "BOB", op = MergeOperation.UPDATE)
-            )
+            val source =
+                listOf(
+                    sourceRecord(1, "ALICE", op = MergeOperation.UPDATE),
+                    sourceRecord(2, "BOB", op = MergeOperation.UPDATE),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -174,25 +180,27 @@ class DeltaMergeEngineTest {
 
             val newRecords = readRecords(result.addFiles[0])
             newRecords shouldHaveSize 2
-            newRecords.map { it.get("name").toString() }
+            newRecords
+                .map { it.get("name").toString() }
                 .shouldContainExactlyInAnyOrder("ALICE", "BOB")
         }
     }
 
     @Nested
     inner class DeleteOnly {
-
         @Test
         fun `all existing keys deleted produces RemoveFile with no AddFile`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"), record(2, "Bob"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice"), record(2, "Bob")),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(1, null, op = MergeOperation.DELETE),
-                sourceRecord(2, null, op = MergeOperation.DELETE)
-            )
+            val source =
+                listOf(
+                    sourceRecord(1, null, op = MergeOperation.DELETE),
+                    sourceRecord(2, null, op = MergeOperation.DELETE),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -207,14 +215,16 @@ class DeltaMergeEngineTest {
 
         @Test
         fun `partial delete within file`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"), record(2, "Bob"), record(3, "Charlie"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice"), record(2, "Bob"), record(3, "Charlie")),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(2, null, op = MergeOperation.DELETE)
-            )
+            val source =
+                listOf(
+                    sourceRecord(2, null, op = MergeOperation.DELETE),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -229,23 +239,24 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class MixedOperations {
-
         @Test
         fun `insert update and delete in same batch`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(
-                    record(1, "Alice", 10),
-                    record(2, "Bob", 20),
-                    record(3, "Charlie", 30)
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(
+                        record(1, "Alice", 10),
+                        record(2, "Bob", 20),
+                        record(3, "Charlie", 30),
+                    ),
                 )
-            )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(1, "ALICE", 100, MergeOperation.UPDATE),
-                sourceRecord(2, null, null, MergeOperation.DELETE),
-                sourceRecord(4, "Dave", 40, MergeOperation.INSERT)
-            )
+            val source =
+                listOf(
+                    sourceRecord(1, "ALICE", 100, MergeOperation.UPDATE),
+                    sourceRecord(2, null, null, MergeOperation.DELETE),
+                    sourceRecord(4, "Dave", 40, MergeOperation.INSERT),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -265,18 +276,19 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class Deduplication {
-
         @Test
         fun `keeps latest record when same key appears multiple times`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice")),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(1, "B", op = MergeOperation.UPDATE),
-                sourceRecord(1, "C", op = MergeOperation.UPDATE)
-            )
+            val source =
+                listOf(
+                    sourceRecord(1, "B", op = MergeOperation.UPDATE),
+                    sourceRecord(1, "C", op = MergeOperation.UPDATE),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -289,10 +301,11 @@ class DeltaMergeEngineTest {
         @Test
         fun `delete after insert for same key results in no insert`() {
             val snap = snapshot() // empty table
-            val source = listOf(
-                sourceRecord(1, "Alice", op = MergeOperation.INSERT),
-                sourceRecord(1, null, op = MergeOperation.DELETE)
-            )
+            val source =
+                listOf(
+                    sourceRecord(1, "Alice", op = MergeOperation.INSERT),
+                    sourceRecord(1, null, op = MergeOperation.DELETE),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -302,15 +315,17 @@ class DeltaMergeEngineTest {
 
         @Test
         fun `insert after delete for same key replaces existing row`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice")),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(1, null, op = MergeOperation.DELETE),
-                sourceRecord(1, "Bob", op = MergeOperation.INSERT)
-            )
+            val source =
+                listOf(
+                    sourceRecord(1, null, op = MergeOperation.DELETE),
+                    sourceRecord(1, "Bob", op = MergeOperation.INSERT),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -323,26 +338,29 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class FilePruningEffectiveness {
-
         @Test
         fun `files outside key range are not rewritten`() {
-            val f1 = writeDataFile(
-                "$tablePath/part-low.parquet",
-                listOf(record(1, "A"), record(2, "B"), record(3, "C"))
-            )
-            val f2 = writeDataFile(
-                "$tablePath/part-mid.parquet",
-                listOf(record(10, "J"), record(11, "K"), record(12, "L"))
-            )
-            val f3 = writeDataFile(
-                "$tablePath/part-high.parquet",
-                listOf(record(100, "X"), record(101, "Y"), record(102, "Z"))
-            )
+            val f1 =
+                writeDataFile(
+                    "$tablePath/part-low.parquet",
+                    listOf(record(1, "A"), record(2, "B"), record(3, "C")),
+                )
+            val f2 =
+                writeDataFile(
+                    "$tablePath/part-mid.parquet",
+                    listOf(record(10, "J"), record(11, "K"), record(12, "L")),
+                )
+            val f3 =
+                writeDataFile(
+                    "$tablePath/part-high.parquet",
+                    listOf(record(100, "X"), record(101, "Y"), record(102, "Z")),
+                )
             val snap = snapshot(f1, f2, f3)
-            val source = listOf(
-                sourceRecord(10, "J-UPDATED", op = MergeOperation.UPDATE),
-                sourceRecord(50, "NEW", op = MergeOperation.INSERT)
-            )
+            val source =
+                listOf(
+                    sourceRecord(10, "J-UPDATED", op = MergeOperation.UPDATE),
+                    sourceRecord(50, "NEW", op = MergeOperation.INSERT),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -357,13 +375,13 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class EmptyMerge {
-
         @Test
         fun `no-op when source batch is empty`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice")),
+                )
             val snap = snapshot(file)
 
             val result = engine().merge(snap, emptyList())
@@ -379,14 +397,16 @@ class DeltaMergeEngineTest {
 
         @Test
         fun `source matches no existing rows - all treated as inserts`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"), record(2, "Bob"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice"), record(2, "Bob")),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(100, "New", op = MergeOperation.INSERT)
-            )
+            val source =
+                listOf(
+                    sourceRecord(100, "New", op = MergeOperation.INSERT),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -398,49 +418,56 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class CompositeKeys {
-
         @Test
         fun `merge with two-column composite key`() {
             val compositeSchema = CompositeKeyFixtures.schema
             val writer = ParquetFileWriter(logStore, compositeSchema)
-            val result = writer.write(
-                "$tablePath/part-composite.parquet",
-                listOf(
-                    CompositeKeyFixtures.record("A", 1, "Alice"),
-                    CompositeKeyFixtures.record("A", 2, "Bob"),
-                    CompositeKeyFixtures.record("B", 1, "Charlie")
+            val result =
+                writer.write(
+                    "$tablePath/part-composite.parquet",
+                    listOf(
+                        CompositeKeyFixtures.record("A", 1, "Alice"),
+                        CompositeKeyFixtures.record("A", 2, "Bob"),
+                        CompositeKeyFixtures.record("B", 1, "Charlie"),
+                    ),
                 )
-            )
-            val file = AddFile(
-                path = result.filePath,
-                size = result.fileSize,
-                modificationTime = System.currentTimeMillis(),
-                dataChange = true,
-                stats = result.statsJson
-            )
-            val snap = DeltaSnapshot(
-                version = 0L,
-                activeFiles = setOf(file),
-                metaData = MetaData(
-                    id = "test",
-                    format = Format(),
-                    schemaString = DeltaSchema.toJson(compositeSchema)
-                ),
-                protocol = Protocol(),
-                transactions = emptyMap(),
-                commitInfo = null
-            )
+            val file =
+                AddFile(
+                    path = result.filePath,
+                    size = result.fileSize,
+                    modificationTime = System.currentTimeMillis(),
+                    dataChange = true,
+                    stats = result.statsJson,
+                )
+            val snap =
+                DeltaSnapshot(
+                    version = 0L,
+                    activeFiles = setOf(file),
+                    metaData =
+                        MetaData(
+                            id = "test",
+                            format = Format(),
+                            schemaString = DeltaSchema.toJson(compositeSchema),
+                        ),
+                    protocol = Protocol(),
+                    transactions = emptyMap(),
+                    commitInfo = null,
+                )
 
-            val engine = DeltaMergeEngine(
-                logStore, compositeSchema,
-                CompositeKeyFixtures.keyNames, tablePath
-            )
-            val source = listOf(
-                SourceRecord(
-                    CompositeKeyFixtures.record("A", 1, "ALICE"),
-                    MergeOperation.UPDATE
+            val engine =
+                DeltaMergeEngine(
+                    logStore,
+                    compositeSchema,
+                    CompositeKeyFixtures.keyNames,
+                    tablePath,
                 )
-            )
+            val source =
+                listOf(
+                    SourceRecord(
+                        CompositeKeyFixtures.record("A", 1, "ALICE"),
+                        MergeOperation.UPDATE,
+                    ),
+                )
 
             val mergeResult = engine.merge(snap, source)
 
@@ -450,32 +477,35 @@ class DeltaMergeEngineTest {
 
             val newRecords = reader.read(mergeResult.addFiles[0].path)
             newRecords shouldHaveSize 3
-            val updatedRow = newRecords.find {
-                it.get("tenant_id").toString() == "A" && it.get("id") == 1
-            }!!
+            val updatedRow =
+                newRecords.find {
+                    it.get("tenant_id").toString() == "A" && it.get("id") == 1
+                }!!
             updatedRow.get("name").toString() shouldBe "ALICE"
         }
     }
 
     @Nested
     inner class MultipleExistingFiles {
-
         @Test
         fun `processes changes across multiple files`() {
-            val f1 = writeDataFile(
-                "$tablePath/part-1.parquet",
-                listOf(record(1, "A"), record(2, "B"), record(3, "C"))
-            )
-            val f2 = writeDataFile(
-                "$tablePath/part-2.parquet",
-                listOf(record(4, "D"), record(5, "E"), record(6, "F"))
-            )
+            val f1 =
+                writeDataFile(
+                    "$tablePath/part-1.parquet",
+                    listOf(record(1, "A"), record(2, "B"), record(3, "C")),
+                )
+            val f2 =
+                writeDataFile(
+                    "$tablePath/part-2.parquet",
+                    listOf(record(4, "D"), record(5, "E"), record(6, "F")),
+                )
             val snap = snapshot(f1, f2)
-            val source = listOf(
-                sourceRecord(2, null, op = MergeOperation.DELETE),
-                sourceRecord(5, "E-UPDATED", op = MergeOperation.UPDATE),
-                sourceRecord(7, "G", op = MergeOperation.INSERT)
-            )
+            val source =
+                listOf(
+                    sourceRecord(2, null, op = MergeOperation.DELETE),
+                    sourceRecord(5, "E-UPDATED", op = MergeOperation.UPDATE),
+                    sourceRecord(7, "G", op = MergeOperation.INSERT),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -494,17 +524,18 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class AddFileAndRemoveFileProperties {
-
         @Test
         fun `AddFile has correct stats and size`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice")),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(1, "ALICE", op = MergeOperation.UPDATE)
-            )
+            val source =
+                listOf(
+                    sourceRecord(1, "ALICE", op = MergeOperation.UPDATE),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -519,14 +550,16 @@ class DeltaMergeEngineTest {
 
         @Test
         fun `RemoveFile captures original file metadata`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice")),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(1, null, op = MergeOperation.DELETE)
-            )
+            val source =
+                listOf(
+                    sourceRecord(1, null, op = MergeOperation.DELETE),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -540,17 +573,18 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class NullHandling {
-
         @Test
         fun `null values in non-key columns preserved through merge`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, null, null))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, null, null)),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(2, null, null, MergeOperation.INSERT)
-            )
+            val source =
+                listOf(
+                    sourceRecord(2, null, null, MergeOperation.INSERT),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -562,47 +596,54 @@ class DeltaMergeEngineTest {
 
         @Test
         fun `null merge key values are treated as equal for matching`() {
-            val nullKeySchema = DeltaType.StructType(
-                listOf(
-                    StructField("key", DeltaType.StringType, nullable = true),
-                    StructField("value", DeltaType.IntegerType, nullable = true)
+            val nullKeySchema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("key", DeltaType.StringType, nullable = true),
+                        StructField("value", DeltaType.IntegerType, nullable = true),
+                    ),
                 )
-            )
             val nullKeyAvro = AvroToDeltaConverter.toAvroSchema(nullKeySchema)
 
-            val existingRecord = GenericRecordBuilder(nullKeyAvro)
-                .set("key", null)
-                .set("value", 100)
-                .build()
+            val existingRecord =
+                GenericRecordBuilder(nullKeyAvro)
+                    .set("key", null)
+                    .set("value", 100)
+                    .build()
             val writer = ParquetFileWriter(logStore, nullKeySchema)
             val writeResult = writer.write("$tablePath/part-null-key.parquet", listOf(existingRecord))
-            val file = AddFile(
-                path = writeResult.filePath,
-                size = writeResult.fileSize,
-                modificationTime = System.currentTimeMillis(),
-                dataChange = true,
-                stats = writeResult.statsJson
-            )
-            val snap = DeltaSnapshot(
-                version = 0L,
-                activeFiles = setOf(file),
-                metaData = MetaData(
-                    id = "test",
-                    format = Format(),
-                    schemaString = DeltaSchema.toJson(nullKeySchema)
-                ),
-                protocol = Protocol(),
-                transactions = emptyMap(),
-                commitInfo = null
-            )
+            val file =
+                AddFile(
+                    path = writeResult.filePath,
+                    size = writeResult.fileSize,
+                    modificationTime = System.currentTimeMillis(),
+                    dataChange = true,
+                    stats = writeResult.statsJson,
+                )
+            val snap =
+                DeltaSnapshot(
+                    version = 0L,
+                    activeFiles = setOf(file),
+                    metaData =
+                        MetaData(
+                            id = "test",
+                            format = Format(),
+                            schemaString = DeltaSchema.toJson(nullKeySchema),
+                        ),
+                    protocol = Protocol(),
+                    transactions = emptyMap(),
+                    commitInfo = null,
+                )
 
-            val updatedRecord = GenericRecordBuilder(nullKeyAvro)
-                .set("key", null)
-                .set("value", 999)
-                .build()
-            val source = listOf(
-                SourceRecord(updatedRecord, MergeOperation.UPDATE)
-            )
+            val updatedRecord =
+                GenericRecordBuilder(nullKeyAvro)
+                    .set("key", null)
+                    .set("value", 999)
+                    .build()
+            val source =
+                listOf(
+                    SourceRecord(updatedRecord, MergeOperation.UPDATE),
+                )
 
             val engine = DeltaMergeEngine(logStore, nullKeySchema, listOf("key"), tablePath)
             val result = engine.merge(snap, source)
@@ -619,17 +660,18 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class UnmatchedDeleteIgnored {
-
         @Test
         fun `unmatched delete does not produce insert`() {
-            val file = writeDataFile(
-                "$tablePath/part-existing.parquet",
-                listOf(record(1, "Alice"))
-            )
+            val file =
+                writeDataFile(
+                    "$tablePath/part-existing.parquet",
+                    listOf(record(1, "Alice")),
+                )
             val snap = snapshot(file)
-            val source = listOf(
-                sourceRecord(99, null, op = MergeOperation.DELETE)
-            )
+            val source =
+                listOf(
+                    sourceRecord(99, null, op = MergeOperation.DELETE),
+                )
 
             val result = engine().merge(snap, source)
 
@@ -643,21 +685,23 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class LargeBatch {
-
         @Test
         fun `handles large batch across multiple files`() {
-            val files = (0 until 5).map { fileIdx ->
-                val start = fileIdx * 200
-                val records = (start until start + 200).map { id ->
-                    record(id, "name-$id", id * 10)
+            val files =
+                (0 until 5).map { fileIdx ->
+                    val start = fileIdx * 200
+                    val records =
+                        (start until start + 200).map { id ->
+                            record(id, "name-$id", id * 10)
+                        }
+                    writeDataFile("$tablePath/part-$fileIdx.parquet", records)
                 }
-                writeDataFile("$tablePath/part-$fileIdx.parquet", records)
-            }
             val snap = snapshot(*files.toTypedArray())
 
-            val source = (0 until 1000 step 10).map { id ->
-                sourceRecord(id, "UPDATED-$id", id * 100, MergeOperation.UPDATE)
-            }
+            val source =
+                (0 until 1000 step 10).map { id ->
+                    sourceRecord(id, "UPDATED-$id", id * 100, MergeOperation.UPDATE)
+                }
 
             val result = engine().merge(snap, source)
 
@@ -677,12 +721,12 @@ class DeltaMergeEngineTest {
 
     @Nested
     inner class InvalidMergeKey {
-
         @Test
         fun `throws when merge key column not in schema`() {
-            val exception = org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
-                DeltaMergeEngine(logStore, schema, listOf("nonexistent"), tablePath)
-            }
+            val exception =
+                org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+                    DeltaMergeEngine(logStore, schema, listOf("nonexistent"), tablePath)
+                }
             exception.message shouldBe "Merge key column 'nonexistent' not found in schema"
         }
     }

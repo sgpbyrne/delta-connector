@@ -17,8 +17,9 @@ import org.apache.kafka.common.config.ConfigException
  * - Unity Catalog: optional table registration
  * - Storage provider-specific: contributed dynamically by [StorageProviderRegistry]
  */
-class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, props) {
-
+class DeltaSinkConfig(
+    props: Map<String, String>,
+) : AbstractConfig(CONFIG_DEF, props) {
     val storagePath: String get() = getString(DELTA_STORAGE_PATH)
     val mergeKeys: List<String> get() = getList(DELTA_MERGE_KEYS)
     val tableName: String get() = getString(DELTA_TABLE_NAME)
@@ -50,10 +51,13 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
      * Write mode determines how incoming records are processed and written
      * to the Delta table.
      */
-    enum class WriteMode(val value: String) {
+    enum class WriteMode(
+        val value: String,
+    ) {
         APPEND("append"),
         UPSERT("upsert"),
-        CDC("cdc");
+        CDC("cdc"),
+        ;
 
         companion object {
             fun fromString(value: String): WriteMode =
@@ -62,9 +66,12 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
         }
     }
 
-    enum class CdcEnvelopeFormat(val value: String) {
+    enum class CdcEnvelopeFormat(
+        val value: String,
+    ) {
         DEBEZIUM_FULL("debezium_full"),
-        DEBEZIUM_FLATTENED("debezium_flattened");
+        DEBEZIUM_FLATTENED("debezium_flattened"),
+        ;
 
         companion object {
             fun fromString(value: String): CdcEnvelopeFormat =
@@ -188,116 +195,219 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
 
         val CONFIG_DEF: ConfigDef = buildConfigDef()
 
+        // Config definition is declarative — length is proportional to config properties
+        @Suppress("LongMethod")
         private fun buildConfigDef(): ConfigDef {
-            val configDef = ConfigDef()
-                .define(
-                    DELTA_STORAGE_PATH, Type.STRING, ConfigDef.NO_DEFAULT_VALUE,
-                    Importance.HIGH, DELTA_STORAGE_PATH_DOC,
-                    DELTA_GROUP, 1, Width.LONG, "Storage Path"
-                )
-                .define(
-                    DELTA_MERGE_KEYS, Type.LIST, "",
-                    Importance.HIGH, DELTA_MERGE_KEYS_DOC,
-                    DELTA_GROUP, 2, Width.LONG, "Merge Keys"
-                )
-                .define(
-                    DELTA_TABLE_NAME, Type.STRING, DELTA_TABLE_NAME_DEFAULT,
-                    Importance.MEDIUM, DELTA_TABLE_NAME_DOC,
-                    DELTA_GROUP, 3, Width.LONG, "Table Name Template"
-                )
-                .define(
-                    DELTA_WRITE_MODE, Type.STRING, DELTA_WRITE_MODE_DEFAULT,
-                    ConfigDef.ValidString.`in`("append", "upsert", "cdc"),
-                    Importance.HIGH, DELTA_WRITE_MODE_DOC,
-                    DELTA_GROUP, 4, Width.MEDIUM, "Write Mode"
-                )
-                .define(
-                    DELTA_MERGE_BATCH_SIZE, Type.INT, DELTA_MERGE_BATCH_SIZE_DEFAULT,
-                    ConfigDef.Range.atLeast(1),
-                    Importance.MEDIUM, DELTA_MERGE_BATCH_SIZE_DOC,
-                    DELTA_GROUP, 5, Width.SHORT, "Batch Size"
-                )
-                .define(
-                    DELTA_MERGE_INTERVAL_MS, Type.LONG, DELTA_MERGE_INTERVAL_MS_DEFAULT,
-                    ConfigDef.Range.atLeast(1000),
-                    Importance.MEDIUM, DELTA_MERGE_INTERVAL_MS_DOC,
-                    DELTA_GROUP, 6, Width.SHORT, "Flush Interval (ms)"
-                )
-                .define(
-                    DELTA_MERGE_DELETE_ENABLED, Type.BOOLEAN, DELTA_MERGE_DELETE_ENABLED_DEFAULT,
-                    Importance.MEDIUM, DELTA_MERGE_DELETE_ENABLED_DOC,
-                    DELTA_GROUP, 7, Width.SHORT, "Delete Enabled"
-                )
-                .define(
-                    DELTA_SCHEMA_EVOLUTION, Type.BOOLEAN, DELTA_SCHEMA_EVOLUTION_DEFAULT,
-                    Importance.MEDIUM, DELTA_SCHEMA_EVOLUTION_DOC,
-                    DELTA_GROUP, 8, Width.SHORT, "Schema Evolution"
-                )
-                .define(
-                    DELTA_SCHEMA_REGISTRY_URL, Type.STRING, DELTA_SCHEMA_REGISTRY_URL_DEFAULT,
-                    Importance.LOW, DELTA_SCHEMA_REGISTRY_URL_DOC,
-                    DELTA_GROUP, 9, Width.LONG, "Schema Registry URL"
-                )
-                .define(
-                    DELTA_CHECKPOINT_INTERVAL, Type.INT, DELTA_CHECKPOINT_INTERVAL_DEFAULT,
-                    ConfigDef.Range.atLeast(1),
-                    Importance.LOW, DELTA_CHECKPOINT_INTERVAL_DOC,
-                    DELTA_GROUP, 10, Width.SHORT, "Checkpoint Interval"
-                )
-                .define(
-                    METRICS_OTLP_ENDPOINT, Type.STRING, METRICS_OTLP_ENDPOINT_DEFAULT,
-                    Importance.LOW, METRICS_OTLP_ENDPOINT_DOC,
-                    DELTA_GROUP, 11, Width.LONG, "OTLP Metrics Endpoint"
-                )
-                .define(
-                    CDC_ENVELOPE_FORMAT, Type.STRING, CDC_ENVELOPE_FORMAT_DEFAULT,
-                    ConfigDef.ValidString.`in`("debezium_full", "debezium_flattened"),
-                    Importance.HIGH, CDC_ENVELOPE_FORMAT_DOC,
-                    CDC_GROUP, 1, Width.MEDIUM, "Envelope Format"
-                )
-                .define(
-                    CDC_SOURCE_DATABASE, Type.STRING, CDC_SOURCE_DATABASE_DEFAULT,
-                    ConfigDef.ValidString.`in`("sqlserver"),
-                    Importance.HIGH, CDC_SOURCE_DATABASE_DOC,
-                    CDC_GROUP, 2, Width.MEDIUM, "Source Database"
-                )
-                .define(
-                    UNITY_CATALOG_ENABLED, Type.BOOLEAN, UNITY_CATALOG_ENABLED_DEFAULT,
-                    Importance.MEDIUM, UNITY_CATALOG_ENABLED_DOC,
-                    UNITY_CATALOG_GROUP, 1, Width.SHORT, "Enabled"
-                )
-                .define(
-                    UNITY_CATALOG_WORKSPACE_URL, Type.STRING, "",
-                    Importance.MEDIUM, UNITY_CATALOG_WORKSPACE_URL_DOC,
-                    UNITY_CATALOG_GROUP, 2, Width.LONG, "Workspace URL"
-                )
-                .define(
-                    UNITY_CATALOG_TOKEN, Type.PASSWORD, "",
-                    Importance.MEDIUM, UNITY_CATALOG_TOKEN_DOC,
-                    UNITY_CATALOG_GROUP, 3, Width.LONG, "Token"
-                )
-                .define(
-                    UNITY_CATALOG_NAME, Type.STRING, "",
-                    Importance.MEDIUM, UNITY_CATALOG_NAME_DOC,
-                    UNITY_CATALOG_GROUP, 4, Width.LONG, "Catalog Name"
-                )
-                .define(
-                    UNITY_CATALOG_SCHEMA, Type.STRING, "",
-                    Importance.MEDIUM, UNITY_CATALOG_SCHEMA_DOC,
-                    UNITY_CATALOG_GROUP, 5, Width.LONG, "Schema Name"
-                )
-                .define(
-                    UNITY_CATALOG_WAREHOUSE_ID, Type.STRING, "",
-                    Importance.MEDIUM, UNITY_CATALOG_WAREHOUSE_ID_DOC,
-                    UNITY_CATALOG_GROUP, 6, Width.LONG, "Warehouse ID"
-                )
-                .define(
-                    UNITY_CATALOG_SYNC_INTERVAL_MS, Type.LONG,
-                    UNITY_CATALOG_SYNC_INTERVAL_MS_DEFAULT,
-                    ConfigDef.Range.atLeast(10_000),
-                    Importance.LOW, UNITY_CATALOG_SYNC_INTERVAL_MS_DOC,
-                    UNITY_CATALOG_GROUP, 7, Width.SHORT, "Sync Interval (ms)"
-                )
+            val configDef =
+                ConfigDef()
+                    .define(
+                        DELTA_STORAGE_PATH,
+                        Type.STRING,
+                        ConfigDef.NO_DEFAULT_VALUE,
+                        Importance.HIGH,
+                        DELTA_STORAGE_PATH_DOC,
+                        DELTA_GROUP,
+                        1,
+                        Width.LONG,
+                        "Storage Path",
+                    ).define(
+                        DELTA_MERGE_KEYS,
+                        Type.LIST,
+                        "",
+                        Importance.HIGH,
+                        DELTA_MERGE_KEYS_DOC,
+                        DELTA_GROUP,
+                        2,
+                        Width.LONG,
+                        "Merge Keys",
+                    ).define(
+                        DELTA_TABLE_NAME,
+                        Type.STRING,
+                        DELTA_TABLE_NAME_DEFAULT,
+                        Importance.MEDIUM,
+                        DELTA_TABLE_NAME_DOC,
+                        DELTA_GROUP,
+                        3,
+                        Width.LONG,
+                        "Table Name Template",
+                    ).define(
+                        DELTA_WRITE_MODE,
+                        Type.STRING,
+                        DELTA_WRITE_MODE_DEFAULT,
+                        ConfigDef.ValidString.`in`("append", "upsert", "cdc"),
+                        Importance.HIGH,
+                        DELTA_WRITE_MODE_DOC,
+                        DELTA_GROUP,
+                        4,
+                        Width.MEDIUM,
+                        "Write Mode",
+                    ).define(
+                        DELTA_MERGE_BATCH_SIZE,
+                        Type.INT,
+                        DELTA_MERGE_BATCH_SIZE_DEFAULT,
+                        ConfigDef.Range.atLeast(1),
+                        Importance.MEDIUM,
+                        DELTA_MERGE_BATCH_SIZE_DOC,
+                        DELTA_GROUP,
+                        5,
+                        Width.SHORT,
+                        "Batch Size",
+                    ).define(
+                        DELTA_MERGE_INTERVAL_MS,
+                        Type.LONG,
+                        DELTA_MERGE_INTERVAL_MS_DEFAULT,
+                        ConfigDef.Range.atLeast(1000),
+                        Importance.MEDIUM,
+                        DELTA_MERGE_INTERVAL_MS_DOC,
+                        DELTA_GROUP,
+                        6,
+                        Width.SHORT,
+                        "Flush Interval (ms)",
+                    ).define(
+                        DELTA_MERGE_DELETE_ENABLED,
+                        Type.BOOLEAN,
+                        DELTA_MERGE_DELETE_ENABLED_DEFAULT,
+                        Importance.MEDIUM,
+                        DELTA_MERGE_DELETE_ENABLED_DOC,
+                        DELTA_GROUP,
+                        7,
+                        Width.SHORT,
+                        "Delete Enabled",
+                    ).define(
+                        DELTA_SCHEMA_EVOLUTION,
+                        Type.BOOLEAN,
+                        DELTA_SCHEMA_EVOLUTION_DEFAULT,
+                        Importance.MEDIUM,
+                        DELTA_SCHEMA_EVOLUTION_DOC,
+                        DELTA_GROUP,
+                        8,
+                        Width.SHORT,
+                        "Schema Evolution",
+                    ).define(
+                        DELTA_SCHEMA_REGISTRY_URL,
+                        Type.STRING,
+                        DELTA_SCHEMA_REGISTRY_URL_DEFAULT,
+                        Importance.LOW,
+                        DELTA_SCHEMA_REGISTRY_URL_DOC,
+                        DELTA_GROUP,
+                        9,
+                        Width.LONG,
+                        "Schema Registry URL",
+                    ).define(
+                        DELTA_CHECKPOINT_INTERVAL,
+                        Type.INT,
+                        DELTA_CHECKPOINT_INTERVAL_DEFAULT,
+                        ConfigDef.Range.atLeast(1),
+                        Importance.LOW,
+                        DELTA_CHECKPOINT_INTERVAL_DOC,
+                        DELTA_GROUP,
+                        10,
+                        Width.SHORT,
+                        "Checkpoint Interval",
+                    ).define(
+                        METRICS_OTLP_ENDPOINT,
+                        Type.STRING,
+                        METRICS_OTLP_ENDPOINT_DEFAULT,
+                        Importance.LOW,
+                        METRICS_OTLP_ENDPOINT_DOC,
+                        DELTA_GROUP,
+                        11,
+                        Width.LONG,
+                        "OTLP Metrics Endpoint",
+                    ).define(
+                        CDC_ENVELOPE_FORMAT,
+                        Type.STRING,
+                        CDC_ENVELOPE_FORMAT_DEFAULT,
+                        ConfigDef.ValidString.`in`("debezium_full", "debezium_flattened"),
+                        Importance.HIGH,
+                        CDC_ENVELOPE_FORMAT_DOC,
+                        CDC_GROUP,
+                        1,
+                        Width.MEDIUM,
+                        "Envelope Format",
+                    ).define(
+                        CDC_SOURCE_DATABASE,
+                        Type.STRING,
+                        CDC_SOURCE_DATABASE_DEFAULT,
+                        ConfigDef.ValidString.`in`("sqlserver"),
+                        Importance.HIGH,
+                        CDC_SOURCE_DATABASE_DOC,
+                        CDC_GROUP,
+                        2,
+                        Width.MEDIUM,
+                        "Source Database",
+                    ).define(
+                        UNITY_CATALOG_ENABLED,
+                        Type.BOOLEAN,
+                        UNITY_CATALOG_ENABLED_DEFAULT,
+                        Importance.MEDIUM,
+                        UNITY_CATALOG_ENABLED_DOC,
+                        UNITY_CATALOG_GROUP,
+                        1,
+                        Width.SHORT,
+                        "Enabled",
+                    ).define(
+                        UNITY_CATALOG_WORKSPACE_URL,
+                        Type.STRING,
+                        "",
+                        Importance.MEDIUM,
+                        UNITY_CATALOG_WORKSPACE_URL_DOC,
+                        UNITY_CATALOG_GROUP,
+                        2,
+                        Width.LONG,
+                        "Workspace URL",
+                    ).define(
+                        UNITY_CATALOG_TOKEN,
+                        Type.PASSWORD,
+                        "",
+                        Importance.MEDIUM,
+                        UNITY_CATALOG_TOKEN_DOC,
+                        UNITY_CATALOG_GROUP,
+                        3,
+                        Width.LONG,
+                        "Token",
+                    ).define(
+                        UNITY_CATALOG_NAME,
+                        Type.STRING,
+                        "",
+                        Importance.MEDIUM,
+                        UNITY_CATALOG_NAME_DOC,
+                        UNITY_CATALOG_GROUP,
+                        4,
+                        Width.LONG,
+                        "Catalog Name",
+                    ).define(
+                        UNITY_CATALOG_SCHEMA,
+                        Type.STRING,
+                        "",
+                        Importance.MEDIUM,
+                        UNITY_CATALOG_SCHEMA_DOC,
+                        UNITY_CATALOG_GROUP,
+                        5,
+                        Width.LONG,
+                        "Schema Name",
+                    ).define(
+                        UNITY_CATALOG_WAREHOUSE_ID,
+                        Type.STRING,
+                        "",
+                        Importance.MEDIUM,
+                        UNITY_CATALOG_WAREHOUSE_ID_DOC,
+                        UNITY_CATALOG_GROUP,
+                        6,
+                        Width.LONG,
+                        "Warehouse ID",
+                    ).define(
+                        UNITY_CATALOG_SYNC_INTERVAL_MS,
+                        Type.LONG,
+                        UNITY_CATALOG_SYNC_INTERVAL_MS_DEFAULT,
+                        ConfigDef.Range.atLeast(10_000),
+                        Importance.LOW,
+                        UNITY_CATALOG_SYNC_INTERVAL_MS_DOC,
+                        UNITY_CATALOG_GROUP,
+                        7,
+                        Width.SHORT,
+                        "Sync Interval (ms)",
+                    )
 
             // Add storage provider config keys (discovered via ServiceLoader)
             for (provider in StorageProviderRegistry.allProviders()) {
@@ -312,16 +422,17 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
          */
         fun validateCrossProperties(props: Map<String, String>): List<String> {
             val errors = mutableListOf<String>()
-            val config = try {
-                DeltaSinkConfig(props)
-            } catch (e: ConfigException) {
-                return listOf(e.message ?: "Invalid configuration")
-            }
+            val config =
+                try {
+                    DeltaSinkConfig(props)
+                } catch (e: ConfigException) {
+                    return listOf(e.message ?: "Invalid configuration")
+                }
 
             if (config.writeMode != WriteMode.APPEND && config.mergeKeys.isEmpty()) {
                 errors.add(
                     "$DELTA_MERGE_KEYS is required when $DELTA_WRITE_MODE " +
-                        "is '${config.writeMode.value}'"
+                        "is '${config.writeMode.value}'",
                 )
             }
 
@@ -336,31 +447,31 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
                 if (config.unityCatalogWorkspaceUrl.isBlank()) {
                     errors.add(
                         "$UNITY_CATALOG_WORKSPACE_URL is required " +
-                            "when $UNITY_CATALOG_ENABLED=true"
+                            "when $UNITY_CATALOG_ENABLED=true",
                     )
                 }
                 if (config.unityCatalogName.isBlank()) {
                     errors.add(
                         "$UNITY_CATALOG_NAME is required " +
-                            "when $UNITY_CATALOG_ENABLED=true"
+                            "when $UNITY_CATALOG_ENABLED=true",
                     )
                 }
                 if (config.unityCatalogSchema.isBlank()) {
                     errors.add(
                         "$UNITY_CATALOG_SCHEMA is required " +
-                            "when $UNITY_CATALOG_ENABLED=true"
+                            "when $UNITY_CATALOG_ENABLED=true",
                     )
                 }
                 if (config.unityCatalogWarehouseId.isBlank()) {
                     errors.add(
                         "$UNITY_CATALOG_WAREHOUSE_ID is required " +
-                            "when $UNITY_CATALOG_ENABLED=true"
+                            "when $UNITY_CATALOG_ENABLED=true",
                     )
                 }
                 if (config.unityCatalogToken.isBlank()) {
                     errors.add(
                         "$UNITY_CATALOG_TOKEN is required " +
-                            "when $UNITY_CATALOG_ENABLED=true"
+                            "when $UNITY_CATALOG_ENABLED=true",
                     )
                 }
             }
@@ -371,7 +482,9 @@ class DeltaSinkConfig(props: Map<String, String>) : AbstractConfig(CONFIG_DEF, p
         /**
          * Resolves the Delta table name from the template, substituting \${topic}.
          */
-        fun resolveTableName(template: String, topic: String): String =
-            template.replace("\${topic}", topic)
+        fun resolveTableName(
+            template: String,
+            topic: String,
+        ): String = template.replace("\${topic}", topic)
     }
 }

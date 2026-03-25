@@ -5,8 +5,6 @@ import com.deltaconnect.protocol.storage.LocalFileSystemLogStore
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldNotContain
-import io.kotest.matchers.maps.shouldBeEmpty as shouldBeEmptyMap
-import io.kotest.matchers.maps.shouldHaveSize as shouldHaveMapSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
@@ -15,9 +13,10 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
+import io.kotest.matchers.maps.shouldBeEmpty as shouldBeEmptyMap
+import io.kotest.matchers.maps.shouldHaveSize as shouldHaveMapSize
 
 class TransactionLogReaderTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -34,7 +33,6 @@ class TransactionLogReaderTest {
 
     @Nested
     inner class EmptyTable {
-
         @Test
         fun `getSnapshot returns empty snapshot for non-existent table`() {
             val snapshot = reader.getSnapshot(tablePath)
@@ -56,7 +54,6 @@ class TransactionLogReaderTest {
 
     @Nested
     inner class SingleCommit {
-
         @Test
         fun `captures protocol, metaData, addFile, and commitInfo from initial commit`() {
             val file = LogTestFixtures.addFile("data-001.parquet", size = 2048L)
@@ -80,16 +77,24 @@ class TransactionLogReaderTest {
 
     @Nested
     inner class MultipleCommits {
-
         @Test
         fun `accumulates files across versions`() {
-            LogTestFixtures.writeInitialCommit(logStore, tablePath, listOf(
-                LogTestFixtures.addFile("data-001.parquet")
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.addFile("data-002.parquet"),
-                LogTestFixtures.commitInfo(operation = "WRITE")
-            ))
+            LogTestFixtures.writeInitialCommit(
+                logStore,
+                tablePath,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet"),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("data-002.parquet"),
+                    LogTestFixtures.commitInfo(operation = "WRITE"),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -101,15 +106,29 @@ class TransactionLogReaderTest {
 
         @Test
         fun `handles missing mid-sequence commit gracefully`() {
-            LogTestFixtures.writeInitialCommit(logStore, tablePath, listOf(
-                LogTestFixtures.addFile("data-001.parquet")
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.addFile("data-002.parquet")
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 3L, listOf(
-                LogTestFixtures.addFile("data-004.parquet")
-            ))
+            LogTestFixtures.writeInitialCommit(
+                logStore,
+                tablePath,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet"),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("data-002.parquet"),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                3L,
+                listOf(
+                    LogTestFixtures.addFile("data-004.parquet"),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -122,12 +141,22 @@ class TransactionLogReaderTest {
         @Test
         fun `getLatestVersion returns highest version`() {
             LogTestFixtures.writeInitialCommit(logStore, tablePath)
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.addFile("data-001.parquet")
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 2L, listOf(
-                LogTestFixtures.addFile("data-002.parquet")
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet"),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                2L,
+                listOf(
+                    LogTestFixtures.addFile("data-002.parquet"),
+                ),
+            )
 
             reader.getLatestVersion(tablePath) shouldBe 2L
         }
@@ -135,16 +164,24 @@ class TransactionLogReaderTest {
 
     @Nested
     inner class Reconciliation {
-
         @Test
         fun `remove cancels add across versions`() {
-            LogTestFixtures.writeInitialCommit(logStore, tablePath, listOf(
-                LogTestFixtures.addFile("data-001.parquet")
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.removeFile("data-001.parquet"),
-                LogTestFixtures.addFile("data-002.parquet")
-            ))
+            LogTestFixtures.writeInitialCommit(
+                logStore,
+                tablePath,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet"),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.removeFile("data-001.parquet"),
+                    LogTestFixtures.addFile("data-002.parquet"),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -155,10 +192,15 @@ class TransactionLogReaderTest {
         @Test
         fun `add and remove in same commit results in file absent`() {
             LogTestFixtures.writeInitialCommit(logStore, tablePath)
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.addFile("ephemeral.parquet"),
-                LogTestFixtures.removeFile("ephemeral.parquet")
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("ephemeral.parquet"),
+                    LogTestFixtures.removeFile("ephemeral.parquet"),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -167,12 +209,21 @@ class TransactionLogReaderTest {
 
         @Test
         fun `remove of non-existent path is a no-op`() {
-            LogTestFixtures.writeInitialCommit(logStore, tablePath, listOf(
-                LogTestFixtures.addFile("data-001.parquet")
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.removeFile("does-not-exist.parquet")
-            ))
+            LogTestFixtures.writeInitialCommit(
+                logStore,
+                tablePath,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet"),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.removeFile("does-not-exist.parquet"),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -182,12 +233,21 @@ class TransactionLogReaderTest {
 
         @Test
         fun `re-add same path replaces with latest AddFile`() {
-            LogTestFixtures.writeInitialCommit(logStore, tablePath, listOf(
-                LogTestFixtures.addFile("data-001.parquet", size = 100L)
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.addFile("data-001.parquet", size = 200L)
-            ))
+            LogTestFixtures.writeInitialCommit(
+                logStore,
+                tablePath,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet", size = 100L),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet", size = 200L),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -198,14 +258,18 @@ class TransactionLogReaderTest {
 
     @Nested
     inner class MetaDataHandling {
-
         @Test
         fun `latest metaData replaces earlier`() {
             val schema2 = """{"type":"struct","fields":[{"name":"id","type":"long","nullable":false,"metadata":{}}]}"""
             LogTestFixtures.writeInitialCommit(logStore, tablePath)
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.metaData(id = "updated-id", schemaString = schema2)
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.metaData(id = "updated-id", schemaString = schema2),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -217,13 +281,17 @@ class TransactionLogReaderTest {
 
     @Nested
     inner class ProtocolHandling {
-
         @Test
         fun `latest protocol replaces earlier`() {
             LogTestFixtures.writeInitialCommit(logStore, tablePath)
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.protocol(minReader = 1, minWriter = 3)
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.protocol(minReader = 1, minWriter = 3),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -234,16 +302,25 @@ class TransactionLogReaderTest {
 
     @Nested
     inner class TransactionHandling {
-
         @Test
         fun `accumulates transactions from multiple appIds`() {
             LogTestFixtures.writeInitialCommit(logStore, tablePath)
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.setTransaction("app1", version = 10L)
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 2L, listOf(
-                LogTestFixtures.setTransaction("app2", version = 20L)
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.setTransaction("app1", version = 10L),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                2L,
+                listOf(
+                    LogTestFixtures.setTransaction("app2", version = 20L),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -255,12 +332,22 @@ class TransactionLogReaderTest {
         @Test
         fun `latest transaction for same appId wins`() {
             LogTestFixtures.writeInitialCommit(logStore, tablePath)
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.setTransaction("app1", version = 10L)
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 2L, listOf(
-                LogTestFixtures.setTransaction("app1", version = 30L)
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.setTransaction("app1", version = 10L),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                2L,
+                listOf(
+                    LogTestFixtures.setTransaction("app1", version = 30L),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -271,18 +358,27 @@ class TransactionLogReaderTest {
 
     @Nested
     inner class CommitInfoHandling {
-
         @Test
         fun `only last commit info is retained`() {
             LogTestFixtures.writeInitialCommit(logStore, tablePath)
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.addFile("data-001.parquet"),
-                LogTestFixtures.commitInfo(operation = "WRITE")
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 2L, listOf(
-                LogTestFixtures.addFile("data-002.parquet"),
-                LogTestFixtures.commitInfo(operation = "MERGE")
-            ))
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet"),
+                    LogTestFixtures.commitInfo(operation = "WRITE"),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                2L,
+                listOf(
+                    LogTestFixtures.addFile("data-002.parquet"),
+                    LogTestFixtures.commitInfo(operation = "MERGE"),
+                ),
+            )
 
             val snapshot = reader.getSnapshot(tablePath)
 
@@ -293,15 +389,23 @@ class TransactionLogReaderTest {
 
     @Nested
     inner class CheckpointHandling {
-
         @Test
         fun `still replays from version 0 when last_checkpoint exists`() {
-            LogTestFixtures.writeInitialCommit(logStore, tablePath, listOf(
-                LogTestFixtures.addFile("data-001.parquet")
-            ))
-            LogTestFixtures.writeCommit(logStore, tablePath, 1L, listOf(
-                LogTestFixtures.addFile("data-002.parquet")
-            ))
+            LogTestFixtures.writeInitialCommit(
+                logStore,
+                tablePath,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet"),
+                ),
+            )
+            LogTestFixtures.writeCommit(
+                logStore,
+                tablePath,
+                1L,
+                listOf(
+                    LogTestFixtures.addFile("data-002.parquet"),
+                ),
+            )
             logStore.writeLastCheckpoint(tablePath, """{"version":0,"size":3}""")
 
             val snapshot = reader.getSnapshot(tablePath)
@@ -312,9 +416,13 @@ class TransactionLogReaderTest {
 
         @Test
         fun `handles corrupt last_checkpoint gracefully`() {
-            LogTestFixtures.writeInitialCommit(logStore, tablePath, listOf(
-                LogTestFixtures.addFile("data-001.parquet")
-            ))
+            LogTestFixtures.writeInitialCommit(
+                logStore,
+                tablePath,
+                listOf(
+                    LogTestFixtures.addFile("data-001.parquet"),
+                ),
+            )
             logStore.writeLastCheckpoint(tablePath, "not valid json {{{")
 
             val snapshot = reader.getSnapshot(tablePath)
@@ -343,14 +451,18 @@ class TransactionLogReaderTest {
 
     @Nested
     inner class Scale {
-
         @Test
         fun `handles 100 commits correctly`() {
             LogTestFixtures.writeInitialCommit(logStore, tablePath)
             for (v in 1L..99L) {
-                LogTestFixtures.writeCommit(logStore, tablePath, v, listOf(
-                    LogTestFixtures.addFile("data-%03d.parquet".format(v))
-                ))
+                LogTestFixtures.writeCommit(
+                    logStore,
+                    tablePath,
+                    v,
+                    listOf(
+                        LogTestFixtures.addFile("data-%03d.parquet".format(v)),
+                    ),
+                )
             }
 
             val snapshot = reader.getSnapshot(tablePath)

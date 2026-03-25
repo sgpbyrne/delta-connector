@@ -11,14 +11,15 @@ import org.apache.kafka.connect.sink.SinkRecord
 import org.junit.jupiter.api.Test
 
 class AppendRecordConverterTest {
-
     private val converter = AppendRecordConverter()
 
-    private val schema = SchemaBuilder.struct()
-        .field("id", Schema.INT32_SCHEMA)
-        .field("name", Schema.OPTIONAL_STRING_SCHEMA)
-        .field("value", Schema.OPTIONAL_INT32_SCHEMA)
-        .build()
+    private val schema =
+        SchemaBuilder
+            .struct()
+            .field("id", Schema.INT32_SCHEMA)
+            .field("name", Schema.OPTIONAL_STRING_SCHEMA)
+            .field("value", Schema.OPTIONAL_INT32_SCHEMA)
+            .build()
 
     @Test
     fun `converts record to INSERT`() {
@@ -69,10 +70,11 @@ class AppendRecordConverterTest {
 
     @Test
     fun `handles null optional fields`() {
-        val value = Struct(schema)
-            .put("id", 1)
-            .put("name", null as String?)
-            .put("value", null as Int?)
+        val value =
+            Struct(schema)
+                .put("id", 1)
+                .put("name", null as String?)
+                .put("value", null as Int?)
         val record = SinkRecord("topic", 0, null, null, schema, value, 0)
 
         val result = converter.convert(record, deleteEnabled = true)
@@ -85,10 +87,11 @@ class AppendRecordConverterTest {
 
     @Test
     fun `handles multiple records with same schema`() {
-        val records = (1..5).map { i ->
-            val value = Struct(schema).put("id", i).put("name", "name_$i").put("value", i * 100)
-            SinkRecord("topic", 0, null, null, schema, value, i.toLong())
-        }
+        val records =
+            (1..5).map { i ->
+                val value = Struct(schema).put("id", i).put("name", "name_$i").put("value", i * 100)
+                SinkRecord("topic", 0, null, null, schema, value, i.toLong())
+            }
 
         val results = records.map { converter.convert(it, deleteEnabled = true) }
 

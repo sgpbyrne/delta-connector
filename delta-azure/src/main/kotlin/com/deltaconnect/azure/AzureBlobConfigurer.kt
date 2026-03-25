@@ -11,10 +11,12 @@ import com.azure.storage.common.StorageSharedKeyCredential
 enum class AzureAuthType {
     /** Storage account name + key. */
     STORAGE_KEY,
+
     /** Shared Access Signature token. */
     SAS_TOKEN,
+
     /** Azure Identity DefaultAzureCredential (managed identity, workload identity, service principal via env vars, etc.). */
-    IDENTITY
+    IDENTITY,
 }
 
 /**
@@ -33,14 +35,13 @@ data class AzureBlobConfig(
     val containerName: String,
     val accountKey: String? = null,
     val sasToken: String? = null,
-    val endpoint: String? = null
+    val endpoint: String? = null,
 )
 
 /**
  * Builds an [AzureBlobLogStore] from an [AzureBlobConfig].
  */
 object AzureBlobConfigurer {
-
     /**
      * Create a [BlobContainerClient] from the given configuration.
      *
@@ -49,8 +50,9 @@ object AzureBlobConfigurer {
      * @throws IllegalArgumentException if required credentials are missing for the auth type.
      */
     fun createContainerClient(config: AzureBlobConfig): BlobContainerClient {
-        val endpoint = config.endpoint
-            ?: "https://${config.accountName}.blob.core.windows.net"
+        val endpoint =
+            config.endpoint
+                ?: "https://${config.accountName}.blob.core.windows.net"
 
         val builder = BlobServiceClientBuilder().endpoint(endpoint)
 

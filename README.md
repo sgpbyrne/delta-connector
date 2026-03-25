@@ -31,29 +31,24 @@ In CDC mode, the connector parses Debezium change events and applies inserts, up
 ## Prerequisites
 
 - **JDK 17+**
-- **Docker** (for integration tests — Testcontainers runs Kafka and Azurite)
+- **Docker**
 - Gradle wrapper is included; no separate Gradle install needed
 
 ## Build
 
 ```bash
-# Full build (compile + unit tests)
-./gradlew build
+./gradlew build                         # compile + unit tests
+./gradlew test                          # unit tests only
+./gradlew :delta-protocol:test          # single module
+./gradlew integrationTest               # integration tests (requires Docker)
+./gradlew :delta-connect-dist:shadowJar # shadow JAR in delta-connect-dist/build/libs/
+```
 
-# Unit tests only
-./gradlew test
+### Linting
 
-# Single module
-./gradlew :delta-protocol:test
-
-# Integration tests (requires Docker)
-./gradlew integrationTest
-
-# Shadow JAR (output in delta-connect-dist/build/libs/)
-./gradlew :delta-connect-dist:shadowJar
-
-# Docker image
-./gradlew :delta-connect-dist:dockerBuild
+```bash
+./gradlew ktlintCheck detekt           # check formatting and static analysis
+./gradlew ktlintFormat                 # auto fix formatting
 ```
 
 ## Configuration
@@ -113,7 +108,7 @@ Fork the repo, create a branch, make your changes, run the tests, open a PR.
 ```bash
 git clone https://github.com/<you>/delta-connector.git
 cd delta-connector
-./gradlew build          # compile + unit tests
+./gradlew build           # compile and unit tests
 ./gradlew integrationTest # requires Docker
 ```
 
@@ -136,6 +131,17 @@ test(delta-azure): add Azurite conflict detection test
 - `delta-azure` must not depend on Kafka or Connect
 - All file I/O goes through `DeltaLogStore`
 - Every change needs tests; `./gradlew test` must pass
+- ktlint and detekt must pass; run `./gradlew ktlintCheck detekt` before pushing
+
+## CI/CD
+
+PRs run three checks in parallel: lint (ktlint and detekt), build and unit tests, and integration tests. All three must pass before merge.
+
+Every merge to `main` publishes a snapshot - `{version}-SNAPSHOT` JAR to GitHub Packages and a `snapshot` Docker tag to GHCR. These are overwritten on each merge, so there's always exactly one snapshot representing the latest `main`.
+
+Releases use [release-please](https://github.com/googleapis/release-please). When conventional commits merge to `main`, release-please opens a Release PR that bumps the version and generates a changelog. Merging that PR creates a GitHub Release and publishes the versioned JAR and Docker image.
+
+For pre-release testing, trigger the **Release Candidate** workflow manually from the Actions tab. Provide a version like `0.2.0-rc.1` and it will publish the JAR, Docker image, and a GitHub pre-release you can point a staging environment at.
 
 ## License
 

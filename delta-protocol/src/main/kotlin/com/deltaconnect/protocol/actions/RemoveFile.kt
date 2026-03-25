@@ -19,5 +19,5 @@ data class RemoveFile(
     val dataChange: Boolean,
     val extendedFileMetadata: Boolean? = null,
     val partitionValues: Map<String, String>? = null,
-    val size: Long? = null
+    val size: Long? = null,
 ) : Action

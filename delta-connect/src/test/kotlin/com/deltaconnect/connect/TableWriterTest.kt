@@ -3,15 +3,12 @@ package com.deltaconnect.connect
 import com.deltaconnect.protocol.DeltaTable
 import com.deltaconnect.protocol.merge.MergeOperation
 import com.deltaconnect.protocol.merge.SourceRecord
-import com.deltaconnect.protocol.schema.DeltaSchema
-import com.deltaconnect.protocol.schema.DeltaType
 import com.deltaconnect.protocol.storage.LocalFileSystemLogStore
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.nulls.shouldBeNull
-import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import org.apache.avro.SchemaBuilder
 import org.apache.avro.generic.GenericData
@@ -22,19 +19,24 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class TableWriterTest {
-
     @TempDir
     lateinit var tempDir: Path
 
     private lateinit var logStore: LocalFileSystemLogStore
 
-    private val avroSchema = SchemaBuilder.record("record")
-        .namespace("com.deltaconnect")
-        .fields()
-        .requiredInt("id")
-        .optionalString("name")
-        .name("value").type().nullable().intType().noDefault()
-        .endRecord()
+    private val avroSchema =
+        SchemaBuilder
+            .record("record")
+            .namespace("com.deltaconnect")
+            .fields()
+            .requiredInt("id")
+            .optionalString("name")
+            .name("value")
+            .type()
+            .nullable()
+            .intType()
+            .noDefault()
+            .endRecord()
 
     @BeforeEach
     fun setUp() {
@@ -206,12 +208,22 @@ class TableWriterTest {
         writer.buffer(sourceRecord(1, "alice", 100), tp(0), 0L)
         writer.flush()
 
-        val schema1 = DeltaTable.forPath(logStore, "test_table").snapshot().metaData!!.schemaString
+        val schema1 =
+            DeltaTable
+                .forPath(logStore, "test_table")
+                .snapshot()
+                .metaData!!
+                .schemaString
 
         writer.buffer(sourceRecord(2, "bob", 200), tp(0), 1L)
         writer.flush()
 
-        val schema2 = DeltaTable.forPath(logStore, "test_table").snapshot().metaData!!.schemaString
+        val schema2 =
+            DeltaTable
+                .forPath(logStore, "test_table")
+                .snapshot()
+                .metaData!!
+                .schemaString
         schema2 shouldBe schema1 // same schema, table was reused
     }
 
@@ -229,19 +241,21 @@ class TableWriterTest {
         snapshot.version shouldBe 2L // version 0 = create, 1 = first merge, 2 = second merge
     }
 
-    private fun mergeWriter(tablePath: String): TableWriter = TableWriter(
-        logStore = logStore,
-        tablePath = tablePath,
-        mergeKeys = listOf("id"),
-        writeMode = DeltaSinkConfig.WriteMode.CDC
-    )
+    private fun mergeWriter(tablePath: String): TableWriter =
+        TableWriter(
+            logStore = logStore,
+            tablePath = tablePath,
+            mergeKeys = listOf("id"),
+            writeMode = DeltaSinkConfig.WriteMode.CDC,
+        )
 
-    private fun appendWriter(tablePath: String): TableWriter = TableWriter(
-        logStore = logStore,
-        tablePath = tablePath,
-        mergeKeys = emptyList(),
-        writeMode = DeltaSinkConfig.WriteMode.APPEND
-    )
+    private fun appendWriter(tablePath: String): TableWriter =
+        TableWriter(
+            logStore = logStore,
+            tablePath = tablePath,
+            mergeKeys = emptyList(),
+            writeMode = DeltaSinkConfig.WriteMode.APPEND,
+        )
 
     private fun tp(partition: Int): TopicPartition = TopicPartition("test_topic", partition)
 
@@ -249,7 +263,7 @@ class TableWriterTest {
         id: Int,
         name: String,
         value: Int,
-        op: MergeOperation = MergeOperation.INSERT
+        op: MergeOperation = MergeOperation.INSERT,
     ): SourceRecord {
         val record = GenericData.Record(avroSchema)
         record.put("id", id)

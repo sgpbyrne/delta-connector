@@ -18,6 +18,8 @@ kotest = "5.9.1"
 
 # Plugins
 shadow = "8.3.5"
+ktlint = "12.1.2"
+detekt = "1.23.7"
 
 [libraries]
 # Protocol module deps
@@ -63,3 +65,5 @@ testing = ["junit-jupiter", "mockk", "kotest-assertions"]
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }

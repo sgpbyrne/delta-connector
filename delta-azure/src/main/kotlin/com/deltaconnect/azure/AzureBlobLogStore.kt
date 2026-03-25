@@ -23,16 +23,20 @@ import java.io.OutputStream
  * @param containerClient Azure Blob container client.
  */
 class AzureBlobLogStore(
-    private val containerClient: BlobContainerClient
+    private val containerClient: BlobContainerClient,
 ) : DeltaLogStore {
-
-    override fun writeCommit(tablePath: String, version: Long, content: ByteArray) {
+    override fun writeCommit(
+        tablePath: String,
+        version: Long,
+        content: ByteArray,
+    ) {
         val filePath = commitPath(tablePath, version)
         val blobClient = containerClient.getBlobClient(filePath)
 
         val conditions = BlobRequestConditions().setIfNoneMatch("*")
-        val options = BlobParallelUploadOptions(ByteArrayInputStream(content))
-            .setRequestConditions(conditions)
+        val options =
+            BlobParallelUploadOptions(ByteArrayInputStream(content))
+                .setRequestConditions(conditions)
 
         try {
             blobClient.uploadWithResponse(options, null, null)
@@ -45,18 +49,25 @@ class AzureBlobLogStore(
         }
     }
 
-    override fun readCommit(tablePath: String, version: Long): ByteArray? {
+    override fun readCommit(
+        tablePath: String,
+        version: Long,
+    ): ByteArray? {
         val filePath = commitPath(tablePath, version)
         return readFileBytes(filePath)
     }
 
-    override fun listCommitVersions(tablePath: String, startVersion: Long): List<Long> {
+    override fun listCommitVersions(
+        tablePath: String,
+        startVersion: Long,
+    ): List<Long> {
         val logDir = "$tablePath/_delta_log/"
 
         val options = ListBlobsOptions().setPrefix(logDir)
 
         return try {
-            containerClient.listBlobs(options, null)
+            containerClient
+                .listBlobs(options, null)
                 .asSequence()
                 .map { blobItem -> blobItem.name.substringAfterLast('/') }
                 .filter { name -> name.endsWith(".json") && !name.contains("checkpoint") }
@@ -69,9 +80,10 @@ class AzureBlobLogStore(
         }
     }
 
-    override fun createDataFile(filePath: String): OutputStream {
-        return AzureBlobBufferedOutputStream(containerClient, filePath)
-    }
+    override fun createDataFile(filePath: String): OutputStream = AzureBlobBufferedOutputStream(
+        containerClient,
+        filePath,
+    )
 
     override fun readDataFileAsInputFile(filePath: String): InputFile {
         val blobClient = containerClient.getBlobClient(filePath)
@@ -86,7 +98,10 @@ class AzureBlobLogStore(
         return String(bytes, Charsets.UTF_8)
     }
 
-    override fun writeLastCheckpoint(tablePath: String, content: String) {
+    override fun writeLastCheckpoint(
+        tablePath: String,
+        content: String,
+    ) {
         val filePath = "$tablePath/_delta_log/_last_checkpoint"
         val blobClient = containerClient.getBlobClient(filePath)
         val bytes = content.toByteArray(Charsets.UTF_8)
@@ -105,8 +120,10 @@ class AzureBlobLogStore(
         }
     }
 
-    private fun commitPath(tablePath: String, version: Long): String =
-        "$tablePath/_delta_log/${ActionSerializer.commitFileName(version)}"
+    private fun commitPath(
+        tablePath: String,
+        version: Long,
+    ): String = "$tablePath/_delta_log/${ActionSerializer.commitFileName(version)}"
 
     companion object {
         private val logger = LoggerFactory.getLogger(AzureBlobLogStore::class.java)
@@ -121,9 +138,8 @@ class AzureBlobLogStore(
  */
 internal class AzureBlobBufferedOutputStream(
     private val containerClient: BlobContainerClient,
-    private val filePath: String
+    private val filePath: String,
 ) : OutputStream() {
-
     private val buffer = ByteArrayOutputStream()
     private var closed = false
 
@@ -131,7 +147,11 @@ internal class AzureBlobBufferedOutputStream(
         buffer.write(b)
     }
 
-    override fun write(b: ByteArray, off: Int, len: Int) {
+    override fun write(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ) {
         buffer.write(b, off, len)
     }
 

@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.shadow)
+    `maven-publish`
 }
 
 dependencies {
@@ -32,7 +33,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
     manifest {
         attributes(
             "Implementation-Title" to "Delta Sink Connector",
-            "Implementation-Version" to project.version
+            "Implementation-Version" to project.version,
         )
     }
 }
@@ -40,4 +41,26 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 // Make shadow jar the default artifact
 tasks.named("build") {
     dependsOn(tasks.named("shadowJar"))
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            val repo = System.getenv("GITHUB_REPOSITORY") ?: "deltaconnect/delta-sink-connector"
+            url = uri("https://maven.pkg.github.com/$repo")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR") ?: ""
+                password = System.getenv("GITHUB_TOKEN") ?: ""
+            }
+        }
+    }
+    publications {
+        create<MavenPublication>("shadow") {
+            artifact(tasks.named("shadowJar"))
+            groupId = project.group.toString()
+            artifactId = "delta-sink-connector"
+            version = project.version.toString()
+        }
+    }
 }

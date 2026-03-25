@@ -6,7 +6,6 @@ import com.deltaconnect.protocol.schema.StructField
 import com.deltaconnect.protocol.storage.LocalFileSystemLogStore
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
-import org.apache.avro.generic.GenericRecord
 import org.apache.avro.generic.GenericRecordBuilder
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -16,7 +15,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class ParquetFileReaderTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -31,20 +29,24 @@ class ParquetFileReaderTest {
 
     @Nested
     inner class BasicRead {
-
         @Test
         fun `reads back records written by ParquetFileWriter`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                    ),
                 )
+            writeTestFile(
+                "data/test.parquet",
+                schema,
+                listOf(
+                    mapOf("id" to 1, "name" to "Alice"),
+                    mapOf("id" to 2, "name" to "Bob"),
+                    mapOf("id" to 3, "name" to "Charlie"),
+                ),
             )
-            writeTestFile("data/test.parquet", schema, listOf(
-                mapOf("id" to 1, "name" to "Alice"),
-                mapOf("id" to 2, "name" to "Bob"),
-                mapOf("id" to 3, "name" to "Charlie")
-            ))
 
             val records = reader.read("data/test.parquet")
 
@@ -56,33 +58,37 @@ class ParquetFileReaderTest {
             records[2].get("id") shouldBe 3
             records[2].get("name").toString() shouldBe "Charlie"
         }
-
     }
 
     @Nested
     inner class ColumnProjection {
-
         @Test
         fun `reads only projected columns`() {
-            val fullSchema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true),
-                    StructField("age", DeltaType.IntegerType, nullable = true),
-                    StructField("email", DeltaType.StringType, nullable = true)
+            val fullSchema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                        StructField("age", DeltaType.IntegerType, nullable = true),
+                        StructField("email", DeltaType.StringType, nullable = true),
+                    ),
                 )
+            writeTestFile(
+                "data/wide.parquet",
+                fullSchema,
+                listOf(
+                    mapOf("id" to 1, "name" to "Alice", "age" to 30, "email" to "alice@test.com"),
+                    mapOf("id" to 2, "name" to "Bob", "age" to 25, "email" to "bob@test.com"),
+                ),
             )
-            writeTestFile("data/wide.parquet", fullSchema, listOf(
-                mapOf("id" to 1, "name" to "Alice", "age" to 30, "email" to "alice@test.com"),
-                mapOf("id" to 2, "name" to "Bob", "age" to 25, "email" to "bob@test.com")
-            ))
 
-            val projectionSchema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true)
+            val projectionSchema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                    ),
                 )
-            )
 
             val records = reader.read("data/wide.parquet", projectionSchema)
 
@@ -94,21 +100,27 @@ class ParquetFileReaderTest {
 
         @Test
         fun `projection with single column`() {
-            val fullSchema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true),
-                    StructField("value", DeltaType.LongType, nullable = true)
+            val fullSchema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                        StructField("value", DeltaType.LongType, nullable = true),
+                    ),
                 )
+            writeTestFile(
+                "data/single-proj.parquet",
+                fullSchema,
+                listOf(
+                    mapOf("id" to 1, "name" to "A", "value" to 100L),
+                    mapOf("id" to 2, "name" to "B", "value" to 200L),
+                ),
             )
-            writeTestFile("data/single-proj.parquet", fullSchema, listOf(
-                mapOf("id" to 1, "name" to "A", "value" to 100L),
-                mapOf("id" to 2, "name" to "B", "value" to 200L)
-            ))
 
-            val projectionSchema = DeltaType.StructType(
-                listOf(StructField("value", DeltaType.LongType, nullable = true))
-            )
+            val projectionSchema =
+                DeltaType.StructType(
+                    listOf(StructField("value", DeltaType.LongType, nullable = true)),
+                )
 
             val records = reader.read("data/single-proj.parquet", projectionSchema)
 
@@ -121,27 +133,32 @@ class ParquetFileReaderTest {
 
     @Nested
     inner class SchemaEvolution {
-
         @Test
         fun `reads file with fewer columns than projection - missing columns are null`() {
-            val narrowSchema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true)
+            val narrowSchema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                    ),
                 )
+            writeTestFile(
+                "data/narrow.parquet",
+                narrowSchema,
+                listOf(
+                    mapOf("id" to 1, "name" to "Alice"),
+                    mapOf("id" to 2, "name" to "Bob"),
+                ),
             )
-            writeTestFile("data/narrow.parquet", narrowSchema, listOf(
-                mapOf("id" to 1, "name" to "Alice"),
-                mapOf("id" to 2, "name" to "Bob")
-            ))
 
-            val widerSchema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true),
-                    StructField("age", DeltaType.IntegerType, nullable = true)
+            val widerSchema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                        StructField("age", DeltaType.IntegerType, nullable = true),
+                    ),
                 )
-            )
 
             val records = reader.read("data/narrow.parquet", widerSchema)
 
@@ -156,24 +173,30 @@ class ParquetFileReaderTest {
 
         @Test
         fun `reads file with extra columns when projecting subset`() {
-            val wideSchema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true),
-                    StructField("age", DeltaType.IntegerType, nullable = true),
-                    StructField("email", DeltaType.StringType, nullable = true)
+            val wideSchema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                        StructField("age", DeltaType.IntegerType, nullable = true),
+                        StructField("email", DeltaType.StringType, nullable = true),
+                    ),
                 )
+            writeTestFile(
+                "data/evolved.parquet",
+                wideSchema,
+                listOf(
+                    mapOf("id" to 1, "name" to "Alice", "age" to 30, "email" to "a@test.com"),
+                ),
             )
-            writeTestFile("data/evolved.parquet", wideSchema, listOf(
-                mapOf("id" to 1, "name" to "Alice", "age" to 30, "email" to "a@test.com")
-            ))
 
-            val narrowSchema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true)
+            val narrowSchema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                    ),
                 )
-            )
 
             val records = reader.read("data/evolved.parquet", narrowSchema)
 
@@ -186,12 +209,12 @@ class ParquetFileReaderTest {
 
     @Nested
     inner class StreamingIterator {
-
         @Test
         fun `iterator reads records lazily`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("id", DeltaType.IntegerType, nullable = false)),
+                )
             writeTestFile("data/iter.parquet", schema, (1..5).map { mapOf("id" to it) })
 
             val iter = reader.readIterator("data/iter.parquet")
@@ -208,20 +231,26 @@ class ParquetFileReaderTest {
 
         @Test
         fun `iterator with projection`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                    ),
                 )
+            writeTestFile(
+                "data/iter-proj.parquet",
+                schema,
+                listOf(
+                    mapOf("id" to 1, "name" to "Alice"),
+                    mapOf("id" to 2, "name" to "Bob"),
+                ),
             )
-            writeTestFile("data/iter-proj.parquet", schema, listOf(
-                mapOf("id" to 1, "name" to "Alice"),
-                mapOf("id" to 2, "name" to "Bob")
-            ))
 
-            val projSchema = DeltaType.StructType(
-                listOf(StructField("name", DeltaType.StringType, nullable = true))
-            )
+            val projSchema =
+                DeltaType.StructType(
+                    listOf(StructField("name", DeltaType.StringType, nullable = true)),
+                )
 
             val names = mutableListOf<String>()
             reader.readIterator("data/iter-proj.parquet", projSchema).use { iter ->
@@ -235,9 +264,10 @@ class ParquetFileReaderTest {
 
         @Test
         fun `iterator can be closed early`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("id", DeltaType.IntegerType, nullable = false)),
+                )
             writeTestFile("data/early-close.parquet", schema, (1..100).map { mapOf("id" to it) })
 
             val iter = reader.readIterator("data/early-close.parquet")
@@ -249,9 +279,10 @@ class ParquetFileReaderTest {
 
         @Test
         fun `iterator on empty file`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("id", DeltaType.IntegerType, nullable = false)),
+                )
             writeTestFile("data/empty-iter.parquet", schema, emptyList())
 
             val iter = reader.readIterator("data/empty-iter.parquet")
@@ -262,33 +293,41 @@ class ParquetFileReaderTest {
 
         @Test
         fun `iterator asSequence works`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("value", DeltaType.StringType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("value", DeltaType.StringType, nullable = true),
+                    ),
                 )
+            writeTestFile(
+                "data/seq.parquet",
+                schema,
+                listOf(
+                    mapOf("id" to 1, "value" to "a"),
+                    mapOf("id" to 2, "value" to "b"),
+                    mapOf("id" to 3, "value" to "c"),
+                ),
             )
-            writeTestFile("data/seq.parquet", schema, listOf(
-                mapOf("id" to 1, "value" to "a"),
-                mapOf("id" to 2, "value" to "b"),
-                mapOf("id" to 3, "value" to "c")
-            ))
 
-            val result = reader.readIterator("data/seq.parquet").use { iter ->
-                iter.asSequence()
-                    .filter { (it.get("id") as Int) > 1 }
-                    .map { it.get("value").toString() }
-                    .toList()
-            }
+            val result =
+                reader.readIterator("data/seq.parquet").use { iter ->
+                    iter
+                        .asSequence()
+                        .filter { (it.get("id") as Int) > 1 }
+                        .map { it.get("value").toString() }
+                        .toList()
+                }
 
             result shouldBe listOf("b", "c")
         }
 
         @Test
         fun `next on exhausted iterator throws NoSuchElementException`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("id", DeltaType.IntegerType, nullable = false)),
+                )
             writeTestFile("data/exhausted.parquet", schema, listOf(mapOf("id" to 1)))
 
             val iter = reader.readIterator("data/exhausted.parquet")
@@ -299,15 +338,14 @@ class ParquetFileReaderTest {
         }
     }
 
-
     @Nested
     inner class LargeFile {
-
         @Test
         fun `streams large file via iterator`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("id", DeltaType.IntegerType, nullable = false)),
+                )
             val count = 10_000
             writeTestFile("data/large-iter.parquet", schema, (0 until count).map { mapOf("id" to it) })
 
@@ -325,26 +363,32 @@ class ParquetFileReaderTest {
 
     @Nested
     inner class ComplexTypes {
-
         @Test
         fun `reads arrays and maps`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("tags", DeltaType.ArrayType(DeltaType.StringType, containsNull = false)),
-                    StructField("props", DeltaType.MapType(
-                        DeltaType.StringType, DeltaType.StringType, valueContainsNull = true
-                    ))
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("tags", DeltaType.ArrayType(DeltaType.StringType, containsNull = false)),
+                        StructField(
+                            "props",
+                            DeltaType.MapType(
+                                DeltaType.StringType,
+                                DeltaType.StringType,
+                                valueContainsNull = true,
+                            ),
+                        ),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
-            val records = listOf(
-                GenericRecordBuilder(avroSchema)
-                    .set("id", 1)
-                    .set("tags", listOf("a", "b"))
-                    .set("props", mapOf("key" to "val"))
-                    .build()
-            )
+            val records =
+                listOf(
+                    GenericRecordBuilder(avroSchema)
+                        .set("id", 1)
+                        .set("tags", listOf("a", "b"))
+                        .set("props", mapOf("key" to "val"))
+                        .build(),
+                )
             val writer = ParquetFileWriter(logStore, schema)
             writer.write("data/complex.parquet", records)
 
@@ -361,16 +405,17 @@ class ParquetFileReaderTest {
     private fun writeTestFile(
         filePath: String,
         schema: DeltaType.StructType,
-        rows: List<Map<String, Any?>>
+        rows: List<Map<String, Any?>>,
     ) {
         val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
-        val records = rows.map { row ->
-            val builder = GenericRecordBuilder(avroSchema)
-            for ((key, value) in row) {
-                builder.set(key, value)
+        val records =
+            rows.map { row ->
+                val builder = GenericRecordBuilder(avroSchema)
+                for ((key, value) in row) {
+                    builder.set(key, value)
+                }
+                builder.build()
             }
-            builder.build()
-        }
         val writer = ParquetFileWriter(logStore, schema)
         writer.write(filePath, records)
     }

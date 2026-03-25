@@ -21,20 +21,27 @@ import java.util.concurrent.TimeUnit
  * @property registry The Micrometer meter registry.
  */
 class ConnectorMetrics(
-    private val registry: MeterRegistry = Metrics.globalRegistry
+    private val registry: MeterRegistry = Metrics.globalRegistry,
 ) {
-
     /** Records received in put() calls (before conversion). */
-    fun recordsReceived(topic: String, count: Long) {
-        Counter.builder(RECORDS_RECEIVED)
+    fun recordsReceived(
+        topic: String,
+        count: Long,
+    ) {
+        Counter
+            .builder(RECORDS_RECEIVED)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .increment(count.toDouble())
     }
 
     /** Records successfully converted and buffered. */
-    fun recordsConverted(topic: String, count: Long) {
-        Counter.builder(RECORDS_CONVERTED)
+    fun recordsConverted(
+        topic: String,
+        count: Long,
+    ) {
+        Counter
+            .builder(RECORDS_CONVERTED)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .increment(count.toDouble())
@@ -42,74 +49,107 @@ class ConnectorMetrics(
 
     /** Records sent to dead-letter queue due to conversion errors. */
     fun recordsDlq(topic: String) {
-        Counter.builder(RECORDS_DLQ)
+        Counter
+            .builder(RECORDS_DLQ)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .increment()
     }
 
     /** Records written in a flush. */
-    fun recordsFlushed(topic: String, count: Long) {
-        Counter.builder(RECORDS_FLUSHED)
+    fun recordsFlushed(
+        topic: String,
+        count: Long,
+    ) {
+        Counter
+            .builder(RECORDS_FLUSHED)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .increment(count.toDouble())
     }
 
     /** Time a flush operation and record its duration. */
-    fun recordFlushLatency(topic: String, durationMs: Long) {
-        Timer.builder(FLUSH_LATENCY)
+    fun recordFlushLatency(
+        topic: String,
+        durationMs: Long,
+    ) {
+        Timer
+            .builder(FLUSH_LATENCY)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .record(durationMs, TimeUnit.MILLISECONDS)
     }
 
     /** Delta commit version after a successful flush. */
-    fun commitVersion(topic: String, version: Long) {
+    fun commitVersion(
+        topic: String,
+        version: Long,
+    ) {
         registry.gauge(
             COMMIT_VERSION,
             listOf(Tag.of(TAG_TOPIC, topic)),
-            version.toDouble()
+            version.toDouble(),
         )
     }
 
-    fun mergeRecordsInserted(topic: String, count: Long) {
-        Counter.builder(MERGE_INSERTED)
+    fun mergeRecordsInserted(
+        topic: String,
+        count: Long,
+    ) {
+        Counter
+            .builder(MERGE_INSERTED)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .increment(count.toDouble())
     }
 
-    fun mergeRecordsUpdated(topic: String, count: Long) {
-        Counter.builder(MERGE_UPDATED)
+    fun mergeRecordsUpdated(
+        topic: String,
+        count: Long,
+    ) {
+        Counter
+            .builder(MERGE_UPDATED)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .increment(count.toDouble())
     }
 
-    fun mergeRecordsDeleted(topic: String, count: Long) {
-        Counter.builder(MERGE_DELETED)
+    fun mergeRecordsDeleted(
+        topic: String,
+        count: Long,
+    ) {
+        Counter
+            .builder(MERGE_DELETED)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .increment(count.toDouble())
     }
 
-    fun mergeFilesRewritten(topic: String, count: Int) {
-        Counter.builder(MERGE_FILES_REWRITTEN)
+    fun mergeFilesRewritten(
+        topic: String,
+        count: Int,
+    ) {
+        Counter
+            .builder(MERGE_FILES_REWRITTEN)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .increment(count.toDouble())
     }
 
-    fun mergeFilesSkipped(topic: String, count: Int) {
-        Counter.builder(MERGE_FILES_SKIPPED)
+    fun mergeFilesSkipped(
+        topic: String,
+        count: Int,
+    ) {
+        Counter
+            .builder(MERGE_FILES_SKIPPED)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .increment(count.toDouble())
     }
 
     fun schemaEvolutions(topic: String) {
-        Counter.builder(SCHEMA_EVOLUTIONS)
+        Counter
+            .builder(SCHEMA_EVOLUTIONS)
             .tag(TAG_TOPIC, topic)
             .register(registry)
             .increment()

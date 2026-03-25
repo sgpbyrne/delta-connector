@@ -1,12 +1,16 @@
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.ktlint) apply false
+    alias(libs.plugins.detekt) apply false
 }
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "org.jlleitschuh.gradle.ktlint")
+    apply(plugin = "io.gitlab.arturbosch.detekt")
 
     group = "com.deltaconnect"
-    version = "0.1.0-SNAPSHOT"
+    version = rootProject.findProperty("version") as String? ?: "0.1.0-SNAPSHOT"
 
     repositories {
         mavenCentral()
@@ -30,7 +34,6 @@ subprojects {
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
     }
 
-    // Integration test source set (separate from unit tests, uses Testcontainers)
     val main = the<SourceSetContainer>()["main"]
     val test = the<SourceSetContainer>()["test"]
 
@@ -44,7 +47,6 @@ subprojects {
     configurations[integrationTest.runtimeOnlyConfigurationName]
         .extendsFrom(configurations[test.runtimeOnlyConfigurationName])
 
-    // Make integrationTest a friend of main (allows access to internal members)
     tasks.matching { it.name == "compileIntegrationTestKotlin" }.configureEach {
         (this as org.jetbrains.kotlin.gradle.tasks.KotlinCompile).compilerOptions {
             freeCompilerArgs.add("-Xfriend-paths=${main.output.classesDirs.asPath}")
@@ -92,5 +94,15 @@ subprojects {
             html.required.set(true)
             csv.required.set(false)
         }
+    }
+
+    configure<org.jlleitschuh.gradle.ktlint.KtlintExtension> {
+        version.set("1.5.0")
+    }
+
+    configure<io.gitlab.arturbosch.detekt.extensions.DetektExtension> {
+        config.setFrom(rootProject.files("detekt.yml"))
+        buildUponDefaultConfig = true
+        parallel = true
     }
 }

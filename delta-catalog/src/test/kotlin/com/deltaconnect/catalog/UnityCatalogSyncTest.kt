@@ -9,26 +9,26 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class UnityCatalogSyncTest {
-
     private lateinit var client: DatabricksSqlClient
     private var currentTime: Long = 1_000_000L
 
     @BeforeEach
     fun setUp() {
         client = mockk(relaxed = true)
-        every { client.registerTable(any(), any(), any(), any()) } returns StatementResult(
-            statementId = "stmt-001",
-            state = StatementState.SUCCEEDED
-        )
-        every { client.refreshTable(any(), any(), any()) } returns StatementResult(
-            statementId = "stmt-002",
-            state = StatementState.SUCCEEDED
-        )
+        every { client.registerTable(any(), any(), any(), any()) } returns
+            StatementResult(
+                statementId = "stmt-001",
+                state = StatementState.SUCCEEDED,
+            )
+        every { client.refreshTable(any(), any(), any()) } returns
+            StatementResult(
+                statementId = "stmt-002",
+                state = StatementState.SUCCEEDED,
+            )
     }
 
     @Nested
     inner class Registration {
-
         @Test
         fun `registers table on first flush`() {
             val sync = createSync()
@@ -37,8 +37,10 @@ class UnityCatalogSyncTest {
 
             verify(exactly = 1) {
                 client.registerTable(
-                    "test_catalog", "test_schema", "orders",
-                    "abfss://c@a.dfs.core.windows.net/delta/orders"
+                    "test_catalog",
+                    "test_schema",
+                    "orders",
+                    "abfss://c@a.dfs.core.windows.net/delta/orders",
                 )
             }
             sync.registeredTableCount() shouldBe 1
@@ -88,7 +90,6 @@ class UnityCatalogSyncTest {
 
     @Nested
     inner class PeriodicRefresh {
-
         @Test
         fun `refreshes table after sync interval`() {
             val sync = createSync(syncIntervalMs = 5_000)
@@ -99,7 +100,7 @@ class UnityCatalogSyncTest {
             sync.onTableFlush("orders", "abfss://c@a.dfs.core.windows.net/delta/orders")
             verify(exactly = 0) { client.refreshTable(any(), any(), any()) }
 
-            currentTime += 3_000  // total 6s > 5s interval
+            currentTime += 3_000 // total 6s > 5s interval
             sync.onTableFlush("orders", "abfss://c@a.dfs.core.windows.net/delta/orders")
             verify(exactly = 1) {
                 client.refreshTable("test_catalog", "test_schema", "orders")
@@ -141,13 +142,12 @@ class UnityCatalogSyncTest {
         }
     }
 
-    private fun createSync(syncIntervalMs: Long = 300_000): UnityCatalogSync {
-        return UnityCatalogSync(
+    private fun createSync(syncIntervalMs: Long = 300_000): UnityCatalogSync =
+        UnityCatalogSync(
             client = client,
             catalog = "test_catalog",
             schema = "test_schema",
             syncIntervalMs = syncIntervalMs,
-            clock = { currentTime }
+            clock = { currentTime },
         )
-    }
 }

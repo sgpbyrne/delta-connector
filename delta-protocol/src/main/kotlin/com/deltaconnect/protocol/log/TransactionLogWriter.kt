@@ -15,8 +15,9 @@ import org.slf4j.LoggerFactory
  * already exists.
  *
  */
-class TransactionLogWriter(private val logStore: DeltaLogStore) {
-
+class TransactionLogWriter(
+    private val logStore: DeltaLogStore,
+) {
     private val logger = LoggerFactory.getLogger(TransactionLogWriter::class.java)
 
     /**
@@ -28,7 +29,11 @@ class TransactionLogWriter(private val logStore: DeltaLogStore) {
      * @throws com.deltaconnect.protocol.storage.CommitConflictException if the version already exists.
      * @throws IllegalArgumentException if [actions] is empty.
      */
-    fun commit(tablePath: String, version: Long, actions: List<Action>) {
+    fun commit(
+        tablePath: String,
+        version: Long,
+        actions: List<Action>,
+    ) {
         require(actions.isNotEmpty()) { "Cannot write an empty commit" }
 
         val content = ActionSerializer.serializeActions(actions)
@@ -36,7 +41,9 @@ class TransactionLogWriter(private val logStore: DeltaLogStore) {
 
         logger.debug(
             "Commit written: table={}, version={}, actionCount={}",
-            tablePath, version, actions.size
+            tablePath,
+            version,
+            actions.size,
         )
     }
 }

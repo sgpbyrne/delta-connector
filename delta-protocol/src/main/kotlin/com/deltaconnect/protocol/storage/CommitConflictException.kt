@@ -6,5 +6,5 @@ package com.deltaconnect.protocol.storage
  */
 class CommitConflictException(
     val tablePath: String,
-    val version: Long
+    val version: Long,
 ) : RuntimeException("Commit conflict: version $version already exists at $tablePath")

@@ -25,9 +25,8 @@ class UnityCatalogSync(
     private val catalog: String,
     private val schema: String,
     private val syncIntervalMs: Long,
-    private val clock: () -> Long = System::currentTimeMillis
+    private val clock: () -> Long = System::currentTimeMillis,
 ) {
-
     private val log = LoggerFactory.getLogger(UnityCatalogSync::class.java)
 
     /** Tables that have been registered. */
@@ -43,7 +42,10 @@ class UnityCatalogSync(
      * @param tableName Delta table name (as stored in the Delta log).
      * @param location Full storage location (e.g. `abfss://container@account.dfs.core.windows.net/path/table`).
      */
-    fun onTableFlush(tableName: String, location: String) {
+    fun onTableFlush(
+        tableName: String,
+        location: String,
+    ) {
         if (tableName !in registeredTables) {
             registerTable(tableName, location)
         } else if (shouldSync(tableName)) {
@@ -59,7 +61,10 @@ class UnityCatalogSync(
         return clock() - lastSync >= syncIntervalMs
     }
 
-    private fun registerTable(tableName: String, location: String) {
+    private fun registerTable(
+        tableName: String,
+        location: String,
+    ) {
         try {
             client.registerTable(catalog, schema, tableName, location)
             val now = clock()
@@ -67,12 +72,20 @@ class UnityCatalogSync(
             lastSyncTime[tableName] = now
             log.info(
                 "Table registered in Unity Catalog: {}.{}.{}",
-                catalog, schema, tableName
+                catalog,
+                schema,
+                tableName,
             )
-        } catch (e: Exception) {
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            // Best-effort catalog registration — failures should not block data ingestion
             log.warn(
                 "Failed to register table in Unity Catalog: {}.{}.{} — {}",
-                catalog, schema, tableName, e.message
+                catalog,
+                schema,
+                tableName,
+                e.message,
             )
         }
     }
@@ -83,12 +96,20 @@ class UnityCatalogSync(
             lastSyncTime[tableName] = clock()
             log.info(
                 "Table metadata refreshed in Unity Catalog: {}.{}.{}",
-                catalog, schema, tableName
+                catalog,
+                schema,
+                tableName,
             )
-        } catch (e: Exception) {
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            // Best-effort catalog refresh — failures should not block data ingestion
             log.warn(
                 "Failed to refresh table metadata in Unity Catalog: {}.{}.{} — {}",
-                catalog, schema, tableName, e.message
+                catalog,
+                schema,
+                tableName,
+                e.message,
             )
         }
     }

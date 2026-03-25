@@ -14,7 +14,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class LocalFileSystemLogStoreTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -29,7 +28,6 @@ class LocalFileSystemLogStoreTest {
 
     @Nested
     inner class WriteCommit {
-
         @Test
         fun `writes commit file with correct name`() {
             val content = """{"protocol":{"minReaderVersion":1,"minWriterVersion":2}}""".toByteArray()
@@ -52,9 +50,10 @@ class LocalFileSystemLogStoreTest {
         fun `throws CommitConflictException when version already exists`() {
             store.writeCommit(tablePath, 0, "first".toByteArray())
 
-            val ex = assertThrows<CommitConflictException> {
-                store.writeCommit(tablePath, 0, "second".toByteArray())
-            }
+            val ex =
+                assertThrows<CommitConflictException> {
+                    store.writeCommit(tablePath, 0, "second".toByteArray())
+                }
             ex.tablePath shouldBe tablePath
             ex.version shouldBe 0L
             ex.message shouldContain "version 0"
@@ -74,7 +73,6 @@ class LocalFileSystemLogStoreTest {
 
     @Nested
     inner class ReadCommit {
-
         @Test
         fun `returns null for non-existent version`() {
             store.readCommit(tablePath, 0).shouldBeNull()
@@ -88,7 +86,6 @@ class LocalFileSystemLogStoreTest {
 
     @Nested
     inner class ListCommitVersions {
-
         @Test
         fun `returns empty list for non-existent table`() {
             store.listCommitVersions(tablePath).shouldBeEmpty()
@@ -124,7 +121,6 @@ class LocalFileSystemLogStoreTest {
 
     @Nested
     inner class DataFiles {
-
         @Test
         fun `createDataFile and readDataFileAsInputFile round-trip`() {
             val filePath = "$tablePath/data/part-00000.parquet"
@@ -150,7 +146,6 @@ class LocalFileSystemLogStoreTest {
 
     @Nested
     inner class LastCheckpoint {
-
         @Test
         fun `returns null when no checkpoint exists`() {
             store.readLastCheckpoint(tablePath).shouldBeNull()

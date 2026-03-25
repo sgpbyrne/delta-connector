@@ -1,6 +1,5 @@
 package com.deltaconnect.connect.storage
 
-import org.apache.kafka.common.config.ConfigDef
 import org.apache.kafka.common.config.ConfigException
 import org.slf4j.LoggerFactory
 import java.net.URI
@@ -16,7 +15,6 @@ import java.util.ServiceLoader
  * provider's declared [StorageProvider.schemes].
  */
 object StorageProviderRegistry {
-
     private val log = LoggerFactory.getLogger(StorageProviderRegistry::class.java)
 
     private val providers = mutableMapOf<String, StorageProvider>()
@@ -63,7 +61,7 @@ object StorageProviderRegistry {
                     "(storage path: $storagePath). " +
                     "Available schemes: ${providers.keys.sorted()}. " +
                     "Ensure the appropriate storage backend module " +
-                    "(e.g. delta-azure) is on the classpath."
+                    "(e.g. delta-azure) is on the classpath.",
             )
     }
 
@@ -86,7 +84,8 @@ object StorageProviderRegistry {
             register(provider)
             log.info(
                 "Discovered StorageProvider via ServiceLoader: schemes={}, class={}",
-                provider.schemes(), provider::class.qualifiedName
+                provider.schemes(),
+                provider::class.qualifiedName,
             )
         }
     }
@@ -96,12 +95,11 @@ object StorageProviderRegistry {
      *
      * Handles standard URIs (e.g. `abfss://...`) and plain paths (returns "file").
      */
-    internal fun extractScheme(storagePath: String): String {
-        return try {
+    internal fun extractScheme(storagePath: String): String =
+        try {
             val uri = URI(storagePath)
             uri.scheme?.lowercase() ?: "file"
         } catch (_: Exception) {
             "file"
         }
-    }
 }

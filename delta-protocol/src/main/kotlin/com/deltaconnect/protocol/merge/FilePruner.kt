@@ -23,8 +23,9 @@ import java.time.OffsetDateTime
  *
  * @property mergeKeyFields The merge key column definitions (name and type).
  */
-class FilePruner(private val mergeKeyFields: List<StructField>) {
-
+class FilePruner(
+    private val mergeKeyFields: List<StructField>,
+) {
     /**
      * Partition active files into matching and pruned sets.
      *
@@ -35,7 +36,7 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
      */
     fun prune(
         files: Set<AddFile>,
-        sourceKeyBounds: Map<String, KeyBounds>
+        sourceKeyBounds: Map<String, KeyBounds>,
     ): PruneResult {
         val matching = mutableListOf<AddFile>()
         var prunedCount = 0
@@ -53,11 +54,16 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
         return PruneResult(matching, prunedCount)
     }
 
-    private fun canPrune(file: AddFile, sourceKeyBounds: Map<String, KeyBounds>): Boolean {
+    private fun canPrune(
+        file: AddFile,
+        sourceKeyBounds: Map<String, KeyBounds>,
+    ): Boolean {
         val statsNode = parseStats(file.stats) ?: return false
         val minValues = statsNode.get("minValues") ?: return false
         val maxValues = statsNode.get("maxValues") ?: return false
 
+        // Loop uses continue for missing stats and early return on prune — both are intentional control flow
+        @Suppress("LoopWithTooManyJumpStatements")
         for (field in mergeKeyFields) {
             val sourceBounds = sourceKeyBounds[field.name] ?: continue
             val fileMin = resolveNestedNode(minValues, field.name)
@@ -79,7 +85,7 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
         fileMin: JsonNode,
         fileMax: JsonNode,
         sourceBounds: KeyBounds,
-        fieldType: DeltaType
+        fieldType: DeltaType,
     ): Boolean {
         val fileMaxVsSourceMin = compareStatToValue(fileMax, sourceBounds.min, fieldType)
         if (fileMaxVsSourceMin != null && fileMaxVsSourceMin < 0) {
@@ -94,17 +100,19 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
         return false
     }
 
-    @Suppress("UNCHECKED_CAST")
+    // Type dispatch requires a branch per Delta type
+    @Suppress("UNCHECKED_CAST", "ReturnCount")
     private fun compareStatToValue(
         statNode: JsonNode,
         sourceValue: Comparable<*>,
-        fieldType: DeltaType
+        fieldType: DeltaType,
     ): Int? {
         return try {
             when (fieldType) {
                 is DeltaType.IntegerType,
                 is DeltaType.ShortType,
-                is DeltaType.ByteType -> {
+                is DeltaType.ByteType,
+                -> {
                     if (!statNode.isNumber) return null
                     val statVal = statNode.intValue()
                     val srcVal = (sourceValue as Number).toInt()
@@ -142,15 +150,17 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
                 }
                 is DeltaType.TimestampType -> {
                     if (!statNode.isTextual) return null
-                    val statMicros = parseTimestampToMicros(statNode.textValue())
-                        ?: return null
+                    val statMicros =
+                        parseTimestampToMicros(statNode.textValue())
+                            ?: return null
                     val srcMicros = (sourceValue as Number).toLong()
                     statMicros.compareTo(srcMicros)
                 }
                 is DeltaType.DateType -> {
                     if (!statNode.isTextual) return null
-                    val statDays = parseDateToEpochDays(statNode.textValue())
-                        ?: return null
+                    val statDays =
+                        parseDateToEpochDays(statNode.textValue())
+                            ?: return null
                     val srcDays = (sourceValue as Number).toInt()
                     statDays.compareTo(srcDays)
                 }
@@ -163,15 +173,22 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
                 is DeltaType.BinaryType,
                 is DeltaType.ArrayType,
                 is DeltaType.MapType,
-                is DeltaType.StructType -> null
+                is DeltaType.StructType,
+                -> null
             }
-        } catch (e: Exception) {
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            // Best-effort stats comparison — fall back to not pruning on any failure
             logger.debug("Stats comparison failed for {}: {}", fieldType, e.message)
             null
         }
     }
 
-    private fun resolveNestedNode(node: JsonNode, path: String): JsonNode? {
+    private fun resolveNestedNode(
+        node: JsonNode,
+        path: String,
+    ): JsonNode? {
         val parts = path.split('.')
         var current: JsonNode? = node
         for (part in parts) {
@@ -194,8 +211,8 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
         private val logger = LoggerFactory.getLogger(FilePruner::class.java)
         private val objectMapper = jacksonObjectMapper()
 
-        internal fun parseTimestampToMicros(isoString: String): Long? {
-            return try {
+        internal fun parseTimestampToMicros(isoString: String): Long? =
+            try {
                 val odt = OffsetDateTime.parse(isoString)
                 val epochSecond = odt.toEpochSecond()
                 val nanos = odt.nano.toLong()
@@ -203,14 +220,12 @@ class FilePruner(private val mergeKeyFields: List<StructField>) {
             } catch (_: Exception) {
                 null
             }
-        }
 
-        internal fun parseDateToEpochDays(isoDate: String): Int? {
-            return try {
+        internal fun parseDateToEpochDays(isoDate: String): Int? =
+            try {
                 LocalDate.parse(isoDate).toEpochDay().toInt()
             } catch (_: Exception) {
                 null
             }
-        }
     }
 }

@@ -28,18 +28,20 @@ class DatabricksSqlClient(
     private val workspaceUrl: String,
     private val warehouseId: String,
     private val tokenSupplier: () -> String,
-    private val requestTimeout: Duration = Duration.ofSeconds(30)
+    private val requestTimeout: Duration = Duration.ofSeconds(30),
 ) {
-
     private val log = LoggerFactory.getLogger(DatabricksSqlClient::class.java)
 
-    private val httpClient: HttpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(10))
-        .build()
+    private val httpClient: HttpClient =
+        HttpClient
+            .newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build()
 
-    private val mapper: ObjectMapper = jacksonObjectMapper()
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+    private val mapper: ObjectMapper =
+        jacksonObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+            .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
 
     /**
      * Execute a SQL statement against the Databricks SQL warehouse.
@@ -51,32 +53,35 @@ class DatabricksSqlClient(
     fun executeStatement(statement: String): StatementResult {
         val url = "${workspaceUrl.trimEnd('/')}/api/2.0/sql/statements"
 
-        val requestBody = mapper.writeValueAsString(
-            mapOf(
-                "warehouse_id" to warehouseId,
-                "statement" to statement,
-                "wait_timeout" to "30s",
-                "disposition" to "INLINE",
-                "format" to "JSON_ARRAY"
+        val requestBody =
+            mapper.writeValueAsString(
+                mapOf(
+                    "warehouse_id" to warehouseId,
+                    "statement" to statement,
+                    "wait_timeout" to "30s",
+                    "disposition" to "INLINE",
+                    "format" to "JSON_ARRAY",
+                ),
             )
-        )
 
         log.debug("Executing SQL: warehouse={}, statement={}", warehouseId, statement)
 
-        val request = HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer ${tokenSupplier()}")
-            .timeout(requestTimeout)
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-            .build()
+        val request =
+            HttpRequest
+                .newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer ${tokenSupplier()}")
+                .timeout(requestTimeout)
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build()
 
         val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
 
         if (response.statusCode() !in 200..299) {
             throw SqlExecutionException(
                 "SQL Statement API returned ${response.statusCode()}: ${response.body()}",
-                statement
+                statement,
             )
         }
 
@@ -87,7 +92,7 @@ class DatabricksSqlClient(
                 log.debug("SQL succeeded: statement_id={}", result.statementId)
                 StatementResult(
                     statementId = result.statementId,
-                    state = StatementState.SUCCEEDED
+                    state = StatementState.SUCCEEDED,
                 )
             }
             "FAILED" -> {
@@ -95,7 +100,7 @@ class DatabricksSqlClient(
                 log.warn("SQL failed: statement_id={}, error={}", result.statementId, errorMessage)
                 throw SqlExecutionException(
                     "SQL statement failed: $errorMessage",
-                    statement
+                    statement,
                 )
             }
             "CANCELED" -> {
@@ -105,11 +110,11 @@ class DatabricksSqlClient(
                 // PENDING, RUNNING - shouldn't happen with wait_timeout
                 log.warn(
                     "SQL statement did not complete within timeout: state={}",
-                    result.status.state
+                    result.status.state,
                 )
                 throw SqlExecutionException(
                     "SQL statement timed out in state: ${result.status.state}",
-                    statement
+                    statement,
                 )
             }
         }
@@ -130,7 +135,7 @@ class DatabricksSqlClient(
         catalog: String,
         schema: String,
         tableName: String,
-        location: String
+        location: String,
     ): StatementResult {
         val fqn = "`$catalog`.`$schema`.`$tableName`"
         val sql = "CREATE TABLE IF NOT EXISTS $fqn USING DELTA LOCATION '$location'"
@@ -152,7 +157,7 @@ class DatabricksSqlClient(
     fun refreshTable(
         catalog: String,
         schema: String,
-        tableName: String
+        tableName: String,
     ): StatementResult {
         val fqn = "`$catalog`.`$schema`.`$tableName`"
         val sql = "MSCK REPAIR TABLE $fqn SYNC METADATA"
@@ -164,31 +169,35 @@ class DatabricksSqlClient(
 /** Result of a SQL statement execution. */
 data class StatementResult(
     val statementId: String,
-    val state: StatementState
+    val state: StatementState,
 )
 
 enum class StatementState {
-    SUCCEEDED, FAILED, CANCELED, PENDING, RUNNING
+    SUCCEEDED,
+    FAILED,
+    CANCELED,
+    PENDING,
+    RUNNING,
 }
 
 /** Exception thrown when a SQL statement execution fails. */
 class SqlExecutionException(
     message: String,
     val statement: String,
-    cause: Throwable? = null
+    cause: Throwable? = null,
 ) : RuntimeException(message, cause)
 
 internal data class StatementResponse(
     val statementId: String = "",
-    val status: StatementStatus = StatementStatus()
+    val status: StatementStatus = StatementStatus(),
 ) {
     internal data class StatementStatus(
         val state: String = "",
-        val error: StatementError? = null
+        val error: StatementError? = null,
     )
 
     internal data class StatementError(
         val errorCode: String = "",
-        val message: String = ""
+        val message: String = "",
     )
 }

@@ -17,5 +17,5 @@ data class CommitInfo(
     val operation: String,
     val operationParameters: Map<String, String> = emptyMap(),
     val engineInfo: String? = null,
-    val isBlindAppend: Boolean? = null
+    val isBlindAppend: Boolean? = null,
 ) : Action

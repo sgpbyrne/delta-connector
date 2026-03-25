@@ -26,17 +26,18 @@ data class DeltaSnapshot(
     val metaData: MetaData?,
     val protocol: Protocol?,
     val transactions: Map<String, SetTransaction>,
-    val commitInfo: CommitInfo?
+    val commitInfo: CommitInfo?,
 ) {
     companion object {
         /** Snapshot representing an empty table with no commits. */
-        fun empty(): DeltaSnapshot = DeltaSnapshot(
-            version = -1L,
-            activeFiles = emptySet(),
-            metaData = null,
-            protocol = null,
-            transactions = emptyMap(),
-            commitInfo = null
-        )
+        fun empty(): DeltaSnapshot =
+            DeltaSnapshot(
+                version = -1L,
+                activeFiles = emptySet(),
+                metaData = null,
+                protocol = null,
+                transactions = emptyMap(),
+                commitInfo = null,
+            )
     }
 }

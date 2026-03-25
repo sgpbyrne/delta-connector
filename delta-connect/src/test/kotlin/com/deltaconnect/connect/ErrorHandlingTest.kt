@@ -5,16 +5,12 @@ import com.deltaconnect.connect.storage.StorageProviderRegistry
 import com.deltaconnect.protocol.merge.MergeOperation
 import com.deltaconnect.protocol.merge.SourceRecord
 import com.deltaconnect.protocol.storage.LocalFileSystemLogStore
-import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
 import org.apache.avro.SchemaBuilder
 import org.apache.avro.generic.GenericData
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.connect.data.Schema
-import org.apache.kafka.connect.data.Struct
 import org.apache.kafka.connect.errors.ConnectException
 import org.apache.kafka.connect.sink.ErrantRecordReporter
 import org.apache.kafka.connect.sink.SinkRecord
@@ -29,7 +25,6 @@ import java.nio.file.Path
 import java.util.concurrent.Future
 
 class ErrorHandlingTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -50,7 +45,6 @@ class ErrorHandlingTest {
 
     @Nested
     inner class DlqErrorReporting {
-
         @Test
         fun `reports bad records to DLQ when reporter is available`() {
             val mockReporter = mockk<ErrantRecordReporter>()
@@ -112,32 +106,38 @@ class ErrorHandlingTest {
 
             StorageProviderRegistry.register(LocalStorageProvider(tempDir))
 
-            val avroSchema = SchemaBuilder.record("record")
-                .namespace("com.deltaconnect")
-                .fields()
-                .requiredInt("id")
-                .optionalString("name")
-                .name("value").type().nullable().intType().noDefault()
-                .endRecord()
+            val avroSchema =
+                SchemaBuilder
+                    .record("record")
+                    .namespace("com.deltaconnect")
+                    .fields()
+                    .requiredInt("id")
+                    .optionalString("name")
+                    .name("value")
+                    .type()
+                    .nullable()
+                    .intType()
+                    .noDefault()
+                    .endRecord()
 
-            val selectiveConverter = object : RecordConverter {
-                override fun convert(
-                    record: SinkRecord,
-                    deleteEnabled: Boolean
-                ): SourceRecord? {
-                    if (record.kafkaOffset() % 2 != 0L) {
-                        throw RuntimeException("Bad record at offset ${record.kafkaOffset()}")
+            val selectiveConverter =
+                object : RecordConverter {
+                    override fun convert(
+                        record: SinkRecord,
+                        deleteEnabled: Boolean,
+                    ): SourceRecord? {
+                        if (record.kafkaOffset() % 2 != 0L) {
+                            throw RuntimeException("Bad record at offset ${record.kafkaOffset()}")
+                        }
+                        val rec = GenericData.Record(avroSchema)
+                        rec.put("id", record.kafkaOffset().toInt())
+                        rec.put("name", "name_${record.kafkaOffset()}")
+                        rec.put("value", record.kafkaOffset().toInt() * 100)
+                        return SourceRecord(rec, MergeOperation.INSERT)
                     }
-                    val rec = GenericData.Record(avroSchema)
-                    rec.put("id", record.kafkaOffset().toInt())
-                    rec.put("name", "name_${record.kafkaOffset()}")
-                    rec.put("value", record.kafkaOffset().toInt() * 100)
-                    return SourceRecord(rec, MergeOperation.INSERT)
-                }
 
-                override fun extractSchema(record: SinkRecord) =
-                    throw UnsupportedOperationException()
-            }
+                    override fun extractSchema(record: SinkRecord) = throw UnsupportedOperationException()
+                }
 
             val task = DeltaSinkTask()
             task.initialize(mockContext)
@@ -147,9 +147,10 @@ class ErrorHandlingTest {
             task.start(appendProps())
             task.open(listOf(TopicPartition("orders", 0)))
 
-            val records = (0L..4L).map { offset ->
-                SinkRecord("orders", 0, null, null, null, "data", offset)
-            }
+            val records =
+                (0L..4L).map { offset ->
+                    SinkRecord("orders", 0, null, null, null, "data", offset)
+                }
             task.put(records)
 
             currentTime += 120_000L
@@ -164,7 +165,6 @@ class ErrorHandlingTest {
 
     @Nested
     inner class ErrorClassification {
-
         @Test
         fun `handles NoSuchMethodError for older Connect runtimes`() {
             mockContext = mockk(relaxed = true)
@@ -172,27 +172,31 @@ class ErrorHandlingTest {
 
             StorageProviderRegistry.register(LocalStorageProvider(tempDir))
 
-            val avroSchema = SchemaBuilder.record("record")
-                .namespace("com.deltaconnect")
-                .fields()
-                .requiredInt("id")
-                .optionalString("name")
-                .endRecord()
+            val avroSchema =
+                SchemaBuilder
+                    .record("record")
+                    .namespace("com.deltaconnect")
+                    .fields()
+                    .requiredInt("id")
+                    .optionalString("name")
+                    .endRecord()
 
             val task = DeltaSinkTask()
             task.initialize(mockContext)
             task.logStoreFactory = { logStore }
             task.converterFactory = { _ ->
                 object : RecordConverter {
-                    override fun convert(record: SinkRecord, deleteEnabled: Boolean): SourceRecord {
+                    override fun convert(
+                        record: SinkRecord,
+                        deleteEnabled: Boolean,
+                    ): SourceRecord {
                         val rec = GenericData.Record(avroSchema)
                         rec.put("id", 1)
                         rec.put("name", "test")
                         return SourceRecord(rec, MergeOperation.INSERT)
                     }
 
-                    override fun extractSchema(record: SinkRecord) =
-                        throw UnsupportedOperationException()
+                    override fun extractSchema(record: SinkRecord) = throw UnsupportedOperationException()
                 }
             }
             task.clock = { currentTime }
@@ -204,31 +208,33 @@ class ErrorHandlingTest {
         }
     }
 
-    private fun cdcProps(): Map<String, String> = mapOf(
-        DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
-        DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
-        DeltaSinkConfig.DELTA_WRITE_MODE to "cdc",
-        DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-        DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-    )
+    private fun cdcProps(): Map<String, String> =
+        mapOf(
+            DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
+            DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
+            DeltaSinkConfig.DELTA_WRITE_MODE to "cdc",
+            DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
+            DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+        )
 
-    private fun appendProps(): Map<String, String> = mapOf(
-        DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
-        DeltaSinkConfig.DELTA_MERGE_KEYS to "",
-        DeltaSinkConfig.DELTA_WRITE_MODE to "append",
-        DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-        DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-    )
+    private fun appendProps(): Map<String, String> =
+        mapOf(
+            DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
+            DeltaSinkConfig.DELTA_MERGE_KEYS to "",
+            DeltaSinkConfig.DELTA_WRITE_MODE to "append",
+            DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
+            DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+        )
 
     /**
      * Converter that always throws - simulates malformed records.
      */
     private class FailingConverter : RecordConverter {
-        override fun convert(record: SinkRecord, deleteEnabled: Boolean): SourceRecord? {
-            throw RuntimeException("Simulated conversion failure")
-        }
+        override fun convert(
+            record: SinkRecord,
+            deleteEnabled: Boolean,
+        ): SourceRecord? = throw RuntimeException("Simulated conversion failure")
 
-        override fun extractSchema(record: SinkRecord) =
-            throw UnsupportedOperationException()
+        override fun extractSchema(record: SinkRecord) = throw UnsupportedOperationException()
     }
 }

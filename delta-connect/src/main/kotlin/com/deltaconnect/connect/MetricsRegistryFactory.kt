@@ -19,7 +19,6 @@ import java.time.Duration
  * metric is recorded to all active backends simultaneously.
  */
 object MetricsRegistryFactory {
-
     private val log = LoggerFactory.getLogger(MetricsRegistryFactory::class.java)
 
     /**
@@ -33,27 +32,39 @@ object MetricsRegistryFactory {
         val composite = CompositeMeterRegistry()
 
         // JMX: always on — metrics appear as MBeans under delta.sink.*
-        val jmxRegistry = JmxMeterRegistry(object : JmxConfig {
-            override fun get(key: String): String? = null
-            override fun domain(): String = "delta.sink"
-            override fun step(): Duration = Duration.ofSeconds(30)
-        }, io.micrometer.core.instrument.Clock.SYSTEM)
+        val jmxRegistry =
+            JmxMeterRegistry(
+                object : JmxConfig {
+                    override fun get(key: String): String? = null
+
+                    override fun domain(): String = "delta.sink"
+
+                    override fun step(): Duration = Duration.ofSeconds(30)
+                },
+                io.micrometer.core.instrument.Clock.SYSTEM,
+            )
         composite.add(jmxRegistry)
         log.info("JMX metrics registry enabled: domain=delta.sink")
 
         if (!otlpEndpoint.isNullOrBlank()) {
             try {
-                val otlpRegistry = io.micrometer.registry.otlp.OtlpMeterRegistry(
-                    object : io.micrometer.registry.otlp.OtlpConfig {
-                        override fun get(key: String): String? = null
-                        override fun url(): String = otlpEndpoint
-                        override fun step(): Duration = Duration.ofSeconds(30)
-                    },
-                    io.micrometer.core.instrument.Clock.SYSTEM
-                )
+                val otlpRegistry =
+                    io.micrometer.registry.otlp.OtlpMeterRegistry(
+                        object : io.micrometer.registry.otlp.OtlpConfig {
+                            override fun get(key: String): String? = null
+
+                            override fun url(): String = otlpEndpoint
+
+                            override fun step(): Duration = Duration.ofSeconds(30)
+                        },
+                        io.micrometer.core.instrument.Clock.SYSTEM,
+                    )
                 composite.add(otlpRegistry)
                 log.info("OTLP metrics registry enabled: endpoint={}", otlpEndpoint)
-            } catch (e: Exception) {
+            } catch (
+                @Suppress("TooGenericExceptionCaught") e: Exception,
+            ) {
+                // Best-effort OTLP setup — connector should still function without metrics
                 log.warn("Failed to initialize OTLP metrics registry: {}", e.message)
             }
         }
@@ -68,9 +79,8 @@ object MetricsRegistryFactory {
  * Closes all child registries (stops OTLP background push thread, etc.).
  */
 class CloseableMeterRegistry(
-    val registry: CompositeMeterRegistry
+    val registry: CompositeMeterRegistry,
 ) : AutoCloseable {
-
     override fun close() {
         registry.registries.forEach { child ->
             try {

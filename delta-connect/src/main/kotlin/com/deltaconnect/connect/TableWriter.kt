@@ -43,9 +43,8 @@ class TableWriter(
     private val writeMode: DeltaSinkConfig.WriteMode,
     private val schemaEvolutionEnabled: Boolean = true,
     private val topic: String = "",
-    private val metrics: ConnectorMetrics? = null
+    private val metrics: ConnectorMetrics? = null,
 ) {
-
     private var table: DeltaTable? = null
     private var mergeEngine: DeltaMergeEngine? = null
     private var schema: DeltaType.StructType? = null
@@ -60,7 +59,11 @@ class TableWriter(
      * @param tp The topic partition this record came from.
      * @param offset The Kafka offset of this record.
      */
-    fun buffer(record: SourceRecord, tp: TopicPartition, offset: Long) {
+    fun buffer(
+        record: SourceRecord,
+        tp: TopicPartition,
+        offset: Long,
+    ) {
         buffer.add(record)
         partitionOffsets.merge(tp, offset) { old, new -> maxOf(old, new) }
     }
@@ -84,6 +87,7 @@ class TableWriter(
      *   or empty map if the buffer was empty.
      * @throws ConnectException if schema is incompatible and cannot be evolved.
      */
+    @Suppress("LongMethod") // Flush orchestrates multiple steps that must execute in sequence
     fun flush(): Map<TopicPartition, Long> {
         if (buffer.isEmpty()) return emptyMap()
 
@@ -92,7 +96,9 @@ class TableWriter(
 
         logger.info(
             "Flushing: table={}, records={}, partitions={}",
-            tablePath, buffer.size, partitionOffsets.size
+            tablePath,
+            buffer.size,
+            partitionOffsets.size,
         )
 
         ensureTable()
@@ -104,12 +110,13 @@ class TableWriter(
             metrics?.schemaEvolutions(topic)
         }
 
-        val writeRecords = if (schemaEvolved) {
-            val evolvedAvro = AvroToDeltaConverter.toAvroSchema(schema!!)
-            buffer.map { SourceRecord(projectRecord(it.record, evolvedAvro), it.operation) }
-        } else {
-            buffer
-        }
+        val writeRecords =
+            if (schemaEvolved) {
+                val evolvedAvro = AvroToDeltaConverter.toAvroSchema(schema!!)
+                buffer.map { SourceRecord(projectRecord(it.record, evolvedAvro), it.operation) }
+            } else {
+                buffer
+            }
 
         when (writeMode) {
             DeltaSinkConfig.WriteMode.APPEND -> {
@@ -124,12 +131,13 @@ class TableWriter(
                         size = writeResult.fileSize,
                         modificationTime = System.currentTimeMillis(),
                         dataChange = true,
-                        stats = writeResult.statsJson
-                    )
+                        stats = writeResult.statsJson,
+                    ),
                 )
             }
             DeltaSinkConfig.WriteMode.CDC,
-            DeltaSinkConfig.WriteMode.UPSERT -> {
+            DeltaSinkConfig.WriteMode.UPSERT,
+            -> {
                 val snapshot = table!!.snapshot()
                 val mergeResult = mergeEngine!!.merge(snapshot, writeRecords)
                 txn.addActions(mergeResult.removeFiles)
@@ -148,25 +156,30 @@ class TableWriter(
                 SetTransaction(
                     appId = makeAppId(tp),
                     version = offset,
-                    lastUpdated = System.currentTimeMillis()
-                )
+                    lastUpdated = System.currentTimeMillis(),
+                ),
             )
         }
 
-        val operation = when (writeMode) {
-            DeltaSinkConfig.WriteMode.APPEND -> "WRITE"
-            DeltaSinkConfig.WriteMode.CDC -> "MERGE"
-            DeltaSinkConfig.WriteMode.UPSERT -> "MERGE"
-        }
+        val operation =
+            when (writeMode) {
+                DeltaSinkConfig.WriteMode.APPEND -> "WRITE"
+                DeltaSinkConfig.WriteMode.CDC -> "MERGE"
+                DeltaSinkConfig.WriteMode.UPSERT -> "MERGE"
+            }
 
-        val committedVersion = txn.commit(
-            operation = operation,
-            engineInfo = ENGINE_INFO
-        )
+        val committedVersion =
+            txn.commit(
+                operation = operation,
+                engineInfo = ENGINE_INFO,
+            )
 
         logger.info(
             "Flush committed: table={}, version={}, records={}, operation={}",
-            tablePath, committedVersion, buffer.size, operation
+            tablePath,
+            committedVersion,
+            buffer.size,
+            operation,
         )
 
         metrics?.recordsFlushed(topic, recordCount)
@@ -197,9 +210,7 @@ class TableWriter(
      * Check if incoming records have a different schema than the table and evolve
      * the table schema if needed. Returns true if the schema was evolved.
      */
-    private fun evolveSchemaIfNeeded(
-        txn: com.deltaconnect.protocol.DeltaTransaction
-    ): Boolean {
+    private fun evolveSchemaIfNeeded(txn: com.deltaconnect.protocol.DeltaTransaction): Boolean {
         val firstRecord = buffer.first()
         val incomingDelta = AvroToDeltaConverter.toDeltaType(firstRecord.record.schema)
 
@@ -213,12 +224,14 @@ class TableWriter(
                 if (!schemaEvolutionEnabled) {
                     throw ConnectException(
                         "Schema changed for table $tablePath but schema evolution is disabled. " +
-                            "Enable delta.schema.evolution=true or align source schema."
+                            "Enable delta.schema.evolution=true or align source schema.",
                     )
                 }
                 logger.info(
                     "Schema evolved: table={}, fields={} -> {}",
-                    tablePath, schema!!.fields.size, result.schema.fields.size
+                    tablePath,
+                    schema!!.fields.size,
+                    result.schema.fields.size,
                 )
                 schema = result.schema
                 txn.addAction(
@@ -228,8 +241,8 @@ class TableWriter(
                         schemaString = DeltaSchema.toJson(schema!!),
                         partitionColumns = emptyList(),
                         configuration = emptyMap(),
-                        createdTime = System.currentTimeMillis()
-                    )
+                        createdTime = System.currentTimeMillis(),
+                    ),
                 )
                 if (writeMode != DeltaSinkConfig.WriteMode.APPEND) {
                     mergeEngine = DeltaMergeEngine(logStore, schema!!, mergeKeys, tablePath)
@@ -238,7 +251,7 @@ class TableWriter(
             }
             is SchemaEvolution.MergeResult.Incompatible -> {
                 throw ConnectException(
-                    "Incompatible schema change for table $tablePath: ${result.reason}"
+                    "Incompatible schema change for table $tablePath: ${result.reason}",
                 )
             }
         }
@@ -255,17 +268,21 @@ class TableWriter(
 
         if (snapshot.version < 0) {
             schema = AvroToDeltaConverter.toDeltaType(avroSchema)
-            table = DeltaTable.createOrReplace(
-                logStore, tablePath, schema!!,
-                engineInfo = ENGINE_INFO
-            )
+            table =
+                DeltaTable.createOrReplace(
+                    logStore,
+                    tablePath,
+                    schema!!,
+                    engineInfo = ENGINE_INFO,
+                )
             logger.info("Created Delta table: path={}, schema={}", tablePath, schema)
         } else {
             table = t
             schema = DeltaSchema.fromJson(snapshot.metaData!!.schemaString)
             logger.info(
                 "Opened existing Delta table: path={}, version={}",
-                tablePath, snapshot.version
+                tablePath,
+                snapshot.version,
             )
         }
 
@@ -283,8 +300,7 @@ class TableWriter(
          *
          * Format: `delta-sink:{topic}:{partition}`
          */
-        fun makeAppId(tp: TopicPartition): String =
-            "delta-sink:${tp.topic()}:${tp.partition()}"
+        fun makeAppId(tp: TopicPartition): String = "delta-sink:${tp.topic()}:${tp.partition()}"
 
         /**
          * Project a [GenericRecord] to a target Avro schema. Fields present in the
@@ -293,7 +309,7 @@ class TableWriter(
          */
         internal fun projectRecord(
             record: GenericRecord,
-            targetSchema: org.apache.avro.Schema
+            targetSchema: org.apache.avro.Schema,
         ): GenericRecord {
             if (record.schema == targetSchema) return record
             val projected = GenericData.Record(targetSchema)

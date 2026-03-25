@@ -1,17 +1,17 @@
 package com.deltaconnect.connect
 
 import org.apache.avro.LogicalTypes
-import org.apache.avro.Schema as AvroSchema
 import org.apache.avro.generic.GenericData
 import org.apache.avro.generic.GenericRecord
-import org.apache.kafka.connect.data.Date as ConnectDate
-import org.apache.kafka.connect.data.Decimal as ConnectDecimal
 import org.apache.kafka.connect.data.Schema
 import org.apache.kafka.connect.data.Struct
-import org.apache.kafka.connect.data.Time as ConnectTime
-import org.apache.kafka.connect.data.Timestamp as ConnectTimestamp
 import java.math.BigDecimal
 import java.nio.ByteBuffer
+import org.apache.avro.Schema as AvroSchema
+import org.apache.kafka.connect.data.Date as ConnectDate
+import org.apache.kafka.connect.data.Decimal as ConnectDecimal
+import org.apache.kafka.connect.data.Time as ConnectTime
+import org.apache.kafka.connect.data.Timestamp as ConnectTimestamp
 
 /**
  * Converts Kafka Connect schemas and data to Apache Avro equivalents.
@@ -21,32 +21,38 @@ import java.nio.ByteBuffer
  * other databases).
  */
 object ConnectToAvroConverter {
-
     private const val DEFAULT_DECIMAL_PRECISION = 38
 
     /**
      * Convert a Connect STRUCT schema to an Avro record schema.
      */
-    fun toAvroSchema(connectSchema: Schema, recordName: String = "record"): AvroSchema {
+    fun toAvroSchema(
+        connectSchema: Schema,
+        recordName: String = "record",
+    ): AvroSchema {
         require(connectSchema.type() == Schema.Type.STRUCT) {
             "Expected STRUCT schema, got ${connectSchema.type()}"
         }
-        val fields = connectSchema.fields().map { field ->
-            val avroType = connectFieldToAvro(field.schema())
-            val fieldSchema = if (field.schema().isOptional) {
-                AvroSchema.createUnion(
-                    AvroSchema.create(AvroSchema.Type.NULL), avroType
-                )
-            } else {
-                avroType
+        val fields =
+            connectSchema.fields().map { field ->
+                val avroType = connectFieldToAvro(field.schema())
+                val fieldSchema =
+                    if (field.schema().isOptional) {
+                        AvroSchema.createUnion(
+                            AvroSchema.create(AvroSchema.Type.NULL),
+                            avroType,
+                        )
+                    } else {
+                        avroType
+                    }
+                val defaultValue =
+                    if (field.schema().isOptional) {
+                        AvroSchema.Field.NULL_DEFAULT_VALUE
+                    } else {
+                        null
+                    }
+                AvroSchema.Field(field.name(), fieldSchema, null, defaultValue)
             }
-            val defaultValue = if (field.schema().isOptional) {
-                AvroSchema.Field.NULL_DEFAULT_VALUE
-            } else {
-                null
-            }
-            AvroSchema.Field(field.name(), fieldSchema, null, defaultValue)
-        }
         return AvroSchema.createRecord(recordName, null, "com.deltaconnect", false, fields)
     }
 
@@ -59,14 +65,17 @@ object ConnectToAvroConverter {
      * @param struct The Connect Struct to convert.
      * @param avroSchema The target Avro record schema.
      */
-    fun toGenericRecord(struct: Struct, avroSchema: AvroSchema): GenericRecord {
+    fun toGenericRecord(
+        struct: Struct,
+        avroSchema: AvroSchema,
+    ): GenericRecord {
         val record = GenericData.Record(avroSchema)
         for (field in struct.schema().fields()) {
             val avroField = avroSchema.getField(field.name()) ?: continue
             val value = struct.get(field)
             record.put(
                 field.name(),
-                convertValue(value, field.schema(), avroField.schema())
+                convertValue(value, field.schema(), avroField.schema()),
             )
         }
         return record
@@ -80,34 +89,47 @@ object ConnectToAvroConverter {
         return connectPrimitiveToAvro(schema)
     }
 
-    private fun logicalTypeToAvro(logicalName: String, schema: Schema): AvroSchema? {
-        return when (logicalName) {
+    private fun logicalTypeToAvro(
+        logicalName: String,
+        schema: Schema,
+    ): AvroSchema? =
+        when (logicalName) {
             // Standard Connect decimal
             ConnectDecimal.LOGICAL_NAME -> {
                 val scale = schema.parameters()?.get("scale")?.toInt() ?: 0
-                val precision = schema.parameters()
-                    ?.get("connect.decimal.precision")?.toInt()
-                    ?: DEFAULT_DECIMAL_PRECISION
-                LogicalTypes.decimal(precision, scale)
+                val precision =
+                    schema
+                        .parameters()
+                        ?.get("connect.decimal.precision")
+                        ?.toInt()
+                        ?: DEFAULT_DECIMAL_PRECISION
+                LogicalTypes
+                    .decimal(precision, scale)
                     .addToSchema(AvroSchema.create(AvroSchema.Type.BYTES))
             }
             // Standard Connect date (days since epoch)
             ConnectDate.LOGICAL_NAME,
-            DEBEZIUM_DATE ->
-                LogicalTypes.date()
+            DEBEZIUM_DATE,
+            ->
+                LogicalTypes
+                    .date()
                     .addToSchema(AvroSchema.create(AvroSchema.Type.INT))
             // Standard Connect timestamp (ms)
             ConnectTimestamp.LOGICAL_NAME,
-            DEBEZIUM_TIMESTAMP ->
-                LogicalTypes.timestampMicros()
+            DEBEZIUM_TIMESTAMP,
+            ->
+                LogicalTypes
+                    .timestampMicros()
                     .addToSchema(AvroSchema.create(AvroSchema.Type.LONG))
             // Debezium microsecond timestamp (datetime2)
             DEBEZIUM_MICRO_TIMESTAMP ->
-                LogicalTypes.timestampMicros()
+                LogicalTypes
+                    .timestampMicros()
                     .addToSchema(AvroSchema.create(AvroSchema.Type.LONG))
             // Debezium nanosecond timestamp - truncate to micros
             DEBEZIUM_NANO_TIMESTAMP ->
-                LogicalTypes.timestampMicros()
+                LogicalTypes
+                    .timestampMicros()
                     .addToSchema(AvroSchema.create(AvroSchema.Type.LONG))
             // Debezium zoned timestamp (datetimeoffset) - ISO string
             DEBEZIUM_ZONED_TIMESTAMP ->
@@ -116,20 +138,21 @@ object ConnectToAvroConverter {
             ConnectTime.LOGICAL_NAME,
             DEBEZIUM_TIME,
             DEBEZIUM_MICRO_TIME,
-            DEBEZIUM_NANO_TIME ->
+            DEBEZIUM_NANO_TIME,
+            ->
                 AvroSchema.create(AvroSchema.Type.LONG)
             // Debezium variable scale decimal - string representation
             DEBEZIUM_VARIABLE_SCALE_DECIMAL ->
                 AvroSchema.create(AvroSchema.Type.STRING)
             else -> null
         }
-    }
 
-    private fun connectPrimitiveToAvro(schema: Schema): AvroSchema {
-        return when (schema.type()) {
+    private fun connectPrimitiveToAvro(schema: Schema): AvroSchema =
+        when (schema.type()) {
             Schema.Type.INT8,
             Schema.Type.INT16,
-            Schema.Type.INT32 -> AvroSchema.create(AvroSchema.Type.INT)
+            Schema.Type.INT32,
+            -> AvroSchema.create(AvroSchema.Type.INT)
             Schema.Type.INT64 -> AvroSchema.create(AvroSchema.Type.LONG)
             Schema.Type.FLOAT32 -> AvroSchema.create(AvroSchema.Type.FLOAT)
             Schema.Type.FLOAT64 -> AvroSchema.create(AvroSchema.Type.DOUBLE)
@@ -139,36 +162,39 @@ object ConnectToAvroConverter {
             Schema.Type.STRUCT -> toAvroSchema(schema)
             Schema.Type.ARRAY -> {
                 val itemAvro = connectFieldToAvro(schema.valueSchema())
-                val itemSchema = if (schema.valueSchema().isOptional) {
-                    AvroSchema.createUnion(
-                        AvroSchema.create(AvroSchema.Type.NULL), itemAvro
-                    )
-                } else {
-                    itemAvro
-                }
+                val itemSchema =
+                    if (schema.valueSchema().isOptional) {
+                        AvroSchema.createUnion(
+                            AvroSchema.create(AvroSchema.Type.NULL),
+                            itemAvro,
+                        )
+                    } else {
+                        itemAvro
+                    }
                 AvroSchema.createArray(itemSchema)
             }
             Schema.Type.MAP -> {
                 val valueAvro = connectFieldToAvro(schema.valueSchema())
-                val valueSchema = if (schema.valueSchema().isOptional) {
-                    AvroSchema.createUnion(
-                        AvroSchema.create(AvroSchema.Type.NULL), valueAvro
-                    )
-                } else {
-                    valueAvro
-                }
+                val valueSchema =
+                    if (schema.valueSchema().isOptional) {
+                        AvroSchema.createUnion(
+                            AvroSchema.create(AvroSchema.Type.NULL),
+                            valueAvro,
+                        )
+                    } else {
+                        valueAvro
+                    }
                 AvroSchema.createMap(valueSchema)
             }
             else -> throw IllegalArgumentException(
-                "Unsupported Connect schema type: ${schema.type()}"
+                "Unsupported Connect schema type: ${schema.type()}",
             )
         }
-    }
 
     private fun convertValue(
         value: Any?,
         connectSchema: Schema,
-        avroSchema: AvroSchema
+        avroSchema: AvroSchema,
     ): Any? {
         if (value == null) return null
 
@@ -180,8 +206,11 @@ object ConnectToAvroConverter {
         return convertPrimitiveValue(value, connectSchema, resolveUnion(avroSchema))
     }
 
-    private fun convertLogicalValue(logicalName: String, value: Any): Any? {
-        return when (logicalName) {
+    private fun convertLogicalValue(
+        logicalName: String,
+        value: Any,
+    ): Any? =
+        when (logicalName) {
             ConnectDecimal.LOGICAL_NAME -> {
                 val decimal = value as BigDecimal
                 ByteBuffer.wrap(decimal.unscaledValue().toByteArray())
@@ -215,14 +244,13 @@ object ConnectToAvroConverter {
             }
             else -> null
         }
-    }
 
     private fun convertPrimitiveValue(
         value: Any,
         connectSchema: Schema,
-        avroSchema: AvroSchema
-    ): Any {
-        return when (connectSchema.type()) {
+        avroSchema: AvroSchema,
+    ): Any =
+        when (connectSchema.type()) {
             Schema.Type.INT8 -> (value as Number).toInt()
             Schema.Type.INT16 -> (value as Number).toInt()
             Schema.Type.INT32 -> (value as Number).toInt()
@@ -231,13 +259,14 @@ object ConnectToAvroConverter {
             Schema.Type.FLOAT64 -> (value as Number).toDouble()
             Schema.Type.BOOLEAN -> value as Boolean
             Schema.Type.STRING -> value.toString()
-            Schema.Type.BYTES -> when (value) {
-                is ByteBuffer -> value
-                is ByteArray -> ByteBuffer.wrap(value)
-                else -> throw IllegalArgumentException(
-                    "Cannot convert ${value::class} to bytes"
-                )
-            }
+            Schema.Type.BYTES ->
+                when (value) {
+                    is ByteBuffer -> value
+                    is ByteArray -> ByteBuffer.wrap(value)
+                    else -> throw IllegalArgumentException(
+                        "Cannot convert ${value::class} to bytes",
+                    )
+                }
             Schema.Type.STRUCT -> toGenericRecord(value as Struct, avroSchema)
             Schema.Type.ARRAY -> {
                 @Suppress("UNCHECKED_CAST")
@@ -257,15 +286,13 @@ object ConnectToAvroConverter {
             }
             else -> value
         }
-    }
 
-    private fun resolveUnion(schema: AvroSchema): AvroSchema {
-        return if (schema.type == AvroSchema.Type.UNION) {
+    private fun resolveUnion(schema: AvroSchema): AvroSchema =
+        if (schema.type == AvroSchema.Type.UNION) {
             schema.types.first { it.type != AvroSchema.Type.NULL }
         } else {
             schema
         }
-    }
 
     private const val DEBEZIUM_DATE = "io.debezium.time.Date"
     private const val DEBEZIUM_TIMESTAMP = "io.debezium.time.Timestamp"

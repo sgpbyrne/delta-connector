@@ -23,17 +23,16 @@ import org.apache.parquet.avro.AvroReadSupport
  *
  * @property logStore Storage backend for reading data files.
  */
-class ParquetFileReader(private val logStore: DeltaLogStore) {
-
+class ParquetFileReader(
+    private val logStore: DeltaLogStore,
+) {
     /**
      * Read all records from a Parquet file.
      *
      * @param filePath Path to the Parquet file (relative to store base).
      * @return List of all records in the file.
      */
-    fun read(filePath: String): List<GenericRecord> {
-        return readIterator(filePath).use { it.asSequence().toList() }
-    }
+    fun read(filePath: String): List<GenericRecord> = readIterator(filePath).use { it.asSequence().toList() }
 
     /**
      * Read records from a Parquet file with column projection.
@@ -44,9 +43,10 @@ class ParquetFileReader(private val logStore: DeltaLogStore) {
      * @param projectionSchema Delta schema containing only the columns to read.
      * @return List of records containing only the projected columns.
      */
-    fun read(filePath: String, projectionSchema: DeltaType.StructType): List<GenericRecord> {
-        return readIterator(filePath, projectionSchema).use { it.asSequence().toList() }
-    }
+    fun read(
+        filePath: String,
+        projectionSchema: DeltaType.StructType,
+    ): List<GenericRecord> = readIterator(filePath, projectionSchema).use { it.asSequence().toList() }
 
     /**
      * Return a lazy [CloseableRecordIterator] over the records in a Parquet file.
@@ -59,7 +59,7 @@ class ParquetFileReader(private val logStore: DeltaLogStore) {
      */
     fun readIterator(
         filePath: String,
-        projectionSchema: DeltaType.StructType? = null
+        projectionSchema: DeltaType.StructType? = null,
     ): CloseableRecordIterator {
         val inputFile = logStore.readDataFileAsInputFile(filePath)
 
@@ -70,9 +70,11 @@ class ParquetFileReader(private val logStore: DeltaLogStore) {
             AvroReadSupport.setAvroReadSchema(conf, avroProjection)
         }
 
-        val reader = AvroParquetReader.builder<GenericRecord>(inputFile)
-            .withConf(conf)
-            .build()
+        val reader =
+            AvroParquetReader
+                .builder<GenericRecord>(inputFile)
+                .withConf(conf)
+                .build()
         return CloseableRecordIterator(reader)
     }
 }
@@ -83,9 +85,9 @@ class ParquetFileReader(private val logStore: DeltaLogStore) {
  * Implements both [Iterator] and [AutoCloseable] for use in `use {}` blocks.
  */
 class CloseableRecordIterator(
-    private val reader: org.apache.parquet.hadoop.ParquetReader<GenericRecord>
-) : Iterator<GenericRecord>, AutoCloseable {
-
+    private val reader: org.apache.parquet.hadoop.ParquetReader<GenericRecord>,
+) : Iterator<GenericRecord>,
+    AutoCloseable {
     private var next: GenericRecord? = null
     private var exhausted: Boolean = false
 

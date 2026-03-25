@@ -7,10 +7,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
 class DeltaSchemaTest {
-
     @Nested
     inner class PrimitiveTypes {
-
         @Test
         fun `parses all primitive types`() {
             val json = """{"type":"struct","fields":[
@@ -57,7 +55,6 @@ class DeltaSchemaTest {
 
     @Nested
     inner class ComplexTypes {
-
         @Test
         fun `parses array type`() {
             val json = """{"type":"struct","fields":[
@@ -116,14 +113,16 @@ class DeltaSchemaTest {
 
     @Nested
     inner class RoundTrip {
-
         @Test
         fun `simple schema round-trips`() {
-            val original = DeltaType.StructType(listOf(
-                StructField("id", DeltaType.IntegerType, nullable = false),
-                StructField("name", DeltaType.StringType, nullable = true),
-                StructField("score", DeltaType.DoubleType, nullable = true)
-            ))
+            val original =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                        StructField("score", DeltaType.DoubleType, nullable = true),
+                    ),
+                )
 
             val json = DeltaSchema.toJson(original)
             val parsed = DeltaSchema.fromJson(json)
@@ -132,16 +131,27 @@ class DeltaSchemaTest {
 
         @Test
         fun `complex schema round-trips`() {
-            val original = DeltaType.StructType(listOf(
-                StructField("id", DeltaType.LongType, nullable = false),
-                StructField("amount", DeltaType.DecimalType(19, 4), nullable = true),
-                StructField("tags", DeltaType.ArrayType(DeltaType.StringType, containsNull = false)),
-                StructField("props", DeltaType.MapType(DeltaType.StringType, DeltaType.IntegerType, valueContainsNull = true)),
-                StructField("address", DeltaType.StructType(listOf(
-                    StructField("city", DeltaType.StringType),
-                    StructField("zip", DeltaType.IntegerType, nullable = false)
-                )))
-            ))
+            val original =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.LongType, nullable = false),
+                        StructField("amount", DeltaType.DecimalType(19, 4), nullable = true),
+                        StructField("tags", DeltaType.ArrayType(DeltaType.StringType, containsNull = false)),
+                        StructField(
+                            "props",
+                            DeltaType.MapType(DeltaType.StringType, DeltaType.IntegerType, valueContainsNull = true),
+                        ),
+                        StructField(
+                            "address",
+                            DeltaType.StructType(
+                                listOf(
+                                    StructField("city", DeltaType.StringType),
+                                    StructField("zip", DeltaType.IntegerType, nullable = false),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
 
             val json = DeltaSchema.toJson(original)
             val parsed = DeltaSchema.fromJson(json)
@@ -159,7 +169,6 @@ class DeltaSchemaTest {
 
     @Nested
     inner class FieldMetadata {
-
         @Test
         fun `preserves nullable flag`() {
             val json = """{"type":"struct","fields":[
@@ -175,7 +184,6 @@ class DeltaSchemaTest {
 
     @Nested
     inner class Errors {
-
         @Test
         fun `rejects unknown type`() {
             val json = """{"type":"struct","fields":[

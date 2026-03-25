@@ -9,16 +9,12 @@ import com.deltaconnect.protocol.storage.LocalFileSystemLogStore
 import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.maps.shouldContainKey
-import io.kotest.matchers.maps.shouldHaveSize
-import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import io.mockk.CapturingSlot
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import org.apache.avro.SchemaBuilder
 import org.apache.avro.generic.GenericData
-import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.connect.sink.SinkRecord
 import org.apache.kafka.connect.sink.SinkTaskContext
@@ -30,7 +26,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class DeltaSinkTaskTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -39,13 +34,19 @@ class DeltaSinkTaskTest {
     private lateinit var mockContext: SinkTaskContext
     private var currentTime: Long = 1_000_000L
 
-    private val avroSchema = SchemaBuilder.record("record")
-        .namespace("com.deltaconnect")
-        .fields()
-        .requiredInt("id")
-        .optionalString("name")
-        .name("value").type().nullable().intType().noDefault()
-        .endRecord()
+    private val avroSchema =
+        SchemaBuilder
+            .record("record")
+            .namespace("com.deltaconnect")
+            .fields()
+            .requiredInt("id")
+            .optionalString("name")
+            .name("value")
+            .type()
+            .nullable()
+            .intType()
+            .noDefault()
+            .endRecord()
 
     @BeforeEach
     fun setUp() {
@@ -67,29 +68,32 @@ class DeltaSinkTaskTest {
         StorageProviderRegistry.clear()
     }
 
-    private fun mergeProps(): Map<String, String> = mapOf(
-        DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
-        DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
-        DeltaSinkConfig.DELTA_WRITE_MODE to "cdc",
-        DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-        DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-    )
+    private fun mergeProps(): Map<String, String> =
+        mapOf(
+            DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
+            DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
+            DeltaSinkConfig.DELTA_WRITE_MODE to "cdc",
+            DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
+            DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+        )
 
-    private fun appendProps(): Map<String, String> = mapOf(
-        DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
-        DeltaSinkConfig.DELTA_MERGE_KEYS to "",
-        DeltaSinkConfig.DELTA_WRITE_MODE to "append",
-        DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-        DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-    )
+    private fun appendProps(): Map<String, String> =
+        mapOf(
+            DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
+            DeltaSinkConfig.DELTA_MERGE_KEYS to "",
+            DeltaSinkConfig.DELTA_WRITE_MODE to "append",
+            DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
+            DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+        )
 
-    private fun upsertProps(): Map<String, String> = mapOf(
-        DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
-        DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
-        DeltaSinkConfig.DELTA_WRITE_MODE to "upsert",
-        DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
-        DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000"
-    )
+    private fun upsertProps(): Map<String, String> =
+        mapOf(
+            DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
+            DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
+            DeltaSinkConfig.DELTA_WRITE_MODE to "upsert",
+            DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE to "100",
+            DeltaSinkConfig.DELTA_MERGE_INTERVAL_MS to "60000",
+        )
 
     @Test
     fun `version returns connector version`() {
@@ -98,7 +102,6 @@ class DeltaSinkTaskTest {
 
     @Nested
     inner class Lifecycle {
-
         @Test
         fun `start and stop complete without error`() {
             task.start(mergeProps())
@@ -115,12 +118,12 @@ class DeltaSinkTaskTest {
 
     @Nested
     inner class BasicPutAndFlush {
-
         @Test
         fun `put buffers records and batch flush writes to delta`() {
-            val props = mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "2")
-            }
+            val props =
+                mergeProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "2")
+                }
             task.start(props)
             task.open(listOf(tp(0)))
 
@@ -164,7 +167,6 @@ class DeltaSinkTaskTest {
 
     @Nested
     inner class PreCommitOffsets {
-
         @Test
         fun `preCommit returns empty when no records flushed`() {
             task.start(mergeProps())
@@ -175,9 +177,10 @@ class DeltaSinkTaskTest {
 
         @Test
         fun `preCommit returns committed offsets plus one`() {
-            val props = mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "2")
-            }
+            val props =
+                mergeProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "2")
+                }
             task.start(props)
             task.open(listOf(tp(0)))
 
@@ -192,14 +195,14 @@ class DeltaSinkTaskTest {
 
     @Nested
     inner class OffsetRecovery {
-
         @Test
         fun `open recovers offsets from delta transaction log`() {
             task.start(mergeProps())
             task.open(listOf(tp(0)))
-            val props2 = mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
-            }
+            val props2 =
+                mergeProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
+                }
             task.stop()
 
             val task2 = DeltaSinkTask()
@@ -248,12 +251,12 @@ class DeltaSinkTaskTest {
 
     @Nested
     inner class Rebalance {
-
         @Test
         fun `close flushes remaining records for revoked partitions`() {
-            val props = mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "100") // won't auto-flush
-            }
+            val props =
+                mergeProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "100") // won't auto-flush
+                }
             task.start(props)
             task.open(listOf(tp(0)))
 
@@ -268,9 +271,10 @@ class DeltaSinkTaskTest {
 
         @Test
         fun `close removes committed offsets for revoked partitions`() {
-            val props = mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
-            }
+            val props =
+                mergeProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
+                }
             task.start(props)
             task.open(listOf(tp(0), tp(1)))
 
@@ -287,22 +291,26 @@ class DeltaSinkTaskTest {
 
     @Nested
     inner class MultiTopic {
-
         @Test
         fun `put routes records to correct topic writer`() {
-            val props = mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
-            }
+            val props =
+                mergeProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
+                }
             task.start(props)
-            task.open(listOf(
-                TopicPartition("orders", 0),
-                TopicPartition("customers", 0)
-            ))
+            task.open(
+                listOf(
+                    TopicPartition("orders", 0),
+                    TopicPartition("customers", 0),
+                ),
+            )
 
-            task.put(listOf(
-                sinkRecord("orders", 0, 0L),
-                sinkRecord("customers", 0, 0L)
-            ))
+            task.put(
+                listOf(
+                    sinkRecord("orders", 0, 0L),
+                    sinkRecord("customers", 0, 0L),
+                ),
+            )
 
             DeltaTable.forPath(logStore, "orders").snapshot().version shouldBeGreaterThan -1
             DeltaTable.forPath(logStore, "customers").snapshot().version shouldBeGreaterThan -1
@@ -312,12 +320,12 @@ class DeltaSinkTaskTest {
 
     @Nested
     inner class WriteModes {
-
         @Test
         fun `append mode writes records`() {
-            val props = appendProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
-            }
+            val props =
+                appendProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
+                }
             task.start(props)
             task.open(listOf(tp(0)))
 
@@ -330,9 +338,10 @@ class DeltaSinkTaskTest {
 
         @Test
         fun `upsert mode writes records`() {
-            val props = upsertProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
-            }
+            val props =
+                upsertProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
+                }
             task.start(props)
             task.open(listOf(tp(0)))
 
@@ -346,22 +355,27 @@ class DeltaSinkTaskTest {
         @Test
         fun `upsert mode disables delete processing`() {
             var capturedDeleteEnabled: Boolean? = null
-            val converter = object : RecordConverter {
-                override fun convert(record: SinkRecord, deleteEnabled: Boolean): SourceRecord? {
-                    capturedDeleteEnabled = deleteEnabled
-                    val rec = GenericData.Record(avroSchema)
-                    rec.put("id", 1)
-                    rec.put("name", "test")
-                    rec.put("value", 100)
-                    return SourceRecord(rec, MergeOperation.INSERT)
-                }
-                override fun extractSchema(record: SinkRecord) =
-                    throw UnsupportedOperationException()
-            }
+            val converter =
+                object : RecordConverter {
+                    override fun convert(
+                        record: SinkRecord,
+                        deleteEnabled: Boolean,
+                    ): SourceRecord? {
+                        capturedDeleteEnabled = deleteEnabled
+                        val rec = GenericData.Record(avroSchema)
+                        rec.put("id", 1)
+                        rec.put("name", "test")
+                        rec.put("value", 100)
+                        return SourceRecord(rec, MergeOperation.INSERT)
+                    }
 
-            val props = upsertProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
-            }
+                    override fun extractSchema(record: SinkRecord) = throw UnsupportedOperationException()
+                }
+
+            val props =
+                upsertProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
+                }
             task.converterFactory = { _ -> converter }
             task.start(props)
             task.open(listOf(tp(0)))
@@ -375,13 +389,13 @@ class DeltaSinkTaskTest {
 
     @Nested
     inner class TableNameTemplate {
-
         @Test
         fun `table name template with prefix`() {
-            val props = mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_TABLE_NAME, "cdc_\${topic}")
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
-            }
+            val props =
+                mergeProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_TABLE_NAME, "cdc_\${topic}")
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
+                }
             task.start(props)
             task.open(listOf(tp(0)))
 
@@ -394,10 +408,11 @@ class DeltaSinkTaskTest {
 
         @Test
         fun `static table name`() {
-            val props = mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_TABLE_NAME, "my_fixed_table")
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
-            }
+            val props =
+                mergeProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_TABLE_NAME, "my_fixed_table")
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
+                }
             task.start(props)
             task.open(listOf(tp(0)))
 
@@ -411,32 +426,37 @@ class DeltaSinkTaskTest {
 
     @Nested
     inner class BasePath {
-
         @Test
         fun `resolveBasePath trims trailing slash for plain path`() {
-            val config = DeltaSinkConfig(mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_STORAGE_PATH, "/some/path/")
-            })
+            val config =
+                DeltaSinkConfig(
+                    mergeProps().toMutableMap().apply {
+                        put(DeltaSinkConfig.DELTA_STORAGE_PATH, "/some/path/")
+                    },
+                )
             DeltaSinkTask.resolveBasePath(config) shouldBe "/some/path"
         }
 
         @Test
         fun `resolveBasePath handles path without trailing slash`() {
-            val config = DeltaSinkConfig(mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_STORAGE_PATH, "/some/path")
-            })
+            val config =
+                DeltaSinkConfig(
+                    mergeProps().toMutableMap().apply {
+                        put(DeltaSinkConfig.DELTA_STORAGE_PATH, "/some/path")
+                    },
+                )
             DeltaSinkTask.resolveBasePath(config) shouldBe "/some/path"
         }
     }
 
     @Nested
     inner class ExistingTableReuse {
-
         @Test
         fun `reuses existing table across task restarts`() {
-            val props = mergeProps().toMutableMap().apply {
-                put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
-            }
+            val props =
+                mergeProps().toMutableMap().apply {
+                    put(DeltaSinkConfig.DELTA_MERGE_BATCH_SIZE, "1")
+                }
 
             task.start(props)
             task.open(listOf(tp(0)))
@@ -460,20 +480,25 @@ class DeltaSinkTaskTest {
 
     private fun tp(partition: Int): TopicPartition = TopicPartition("orders", partition)
 
-    private fun sinkRecord(topic: String, partition: Int, offset: Long): SinkRecord {
-        return SinkRecord(topic, partition, null, null, null, null, offset)
-    }
+    private fun sinkRecord(
+        topic: String,
+        partition: Int,
+        offset: Long,
+    ): SinkRecord = SinkRecord(topic, partition, null, null, null, null, offset)
 
-    private fun stubConverter(): RecordConverter = object : RecordConverter {
-        override fun convert(record: SinkRecord, deleteEnabled: Boolean): SourceRecord {
-            val rec = GenericData.Record(avroSchema)
-            rec.put("id", record.kafkaOffset().toInt())
-            rec.put("name", "name_${record.kafkaOffset()}")
-            rec.put("value", record.kafkaOffset().toInt() * 100)
-            return SourceRecord(rec, MergeOperation.INSERT)
+    private fun stubConverter(): RecordConverter =
+        object : RecordConverter {
+            override fun convert(
+                record: SinkRecord,
+                deleteEnabled: Boolean,
+            ): SourceRecord {
+                val rec = GenericData.Record(avroSchema)
+                rec.put("id", record.kafkaOffset().toInt())
+                rec.put("name", "name_${record.kafkaOffset()}")
+                rec.put("value", record.kafkaOffset().toInt() * 100)
+                return SourceRecord(rec, MergeOperation.INSERT)
+            }
+
+            override fun extractSchema(record: SinkRecord) = throw UnsupportedOperationException()
         }
-
-        override fun extractSchema(record: SinkRecord) =
-            throw UnsupportedOperationException()
-    }
 }

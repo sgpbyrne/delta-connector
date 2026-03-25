@@ -11,7 +11,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class StorageProviderRegistryTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -41,9 +40,10 @@ class StorageProviderRegistryTest {
 
     @Test
     fun `resolve throws for unknown scheme`() {
-        val ex = assertThrows<ConfigException> {
-            StorageProviderRegistry.resolve("s3a://bucket/path")
-        }
+        val ex =
+            assertThrows<ConfigException> {
+                StorageProviderRegistry.resolve("s3a://bucket/path")
+            }
         ex.message shouldContain "No StorageProvider found for scheme 's3a'"
     }
 

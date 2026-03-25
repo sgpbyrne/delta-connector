@@ -7,7 +7,6 @@ import io.micrometer.jmx.JmxMeterRegistry
 import org.junit.jupiter.api.Test
 
 class MetricsRegistryFactoryTest {
-
     @Test
     fun `creates JMX registry by default`() {
         val closeable = MetricsRegistryFactory.create()
@@ -22,9 +21,10 @@ class MetricsRegistryFactoryTest {
 
     @Test
     fun `creates JMX plus OTLP when endpoint provided`() {
-        val closeable = MetricsRegistryFactory.create(
-            otlpEndpoint = "http://localhost:4318/v1/metrics"
-        )
+        val closeable =
+            MetricsRegistryFactory.create(
+                otlpEndpoint = "http://localhost:4318/v1/metrics",
+            )
         try {
             val registries = closeable.registry.registries.toList()
             registries shouldHaveAtLeastSize 2
@@ -72,8 +72,11 @@ class MetricsRegistryFactoryTest {
             val metrics = ConnectorMetrics(closeable.registry)
             metrics.recordsReceived("orders", 42)
 
-            val counter = closeable.registry.find(ConnectorMetrics.RECORDS_RECEIVED)
-                .tag("topic", "orders").counter()
+            val counter =
+                closeable.registry
+                    .find(ConnectorMetrics.RECORDS_RECEIVED)
+                    .tag("topic", "orders")
+                    .counter()
             counter!!.count() shouldBe 42.0
         } finally {
             closeable.close()

@@ -30,8 +30,9 @@ import org.slf4j.LoggerFactory
  *
  * @property logStore Storage backend for reading/writing checkpoint files.
  */
-class CheckpointWriter(private val logStore: DeltaLogStore) {
-
+class CheckpointWriter(
+    private val logStore: DeltaLogStore,
+) {
     /**
      * Write a V1 checkpoint for the given snapshot.
      *
@@ -42,7 +43,10 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
      * @param snapshot The snapshot to checkpoint. Must have version >= 0, Protocol, and MetaData.
      * @throws IllegalArgumentException if the snapshot is invalid for checkpointing.
      */
-    fun writeCheckpoint(tablePath: String, snapshot: DeltaSnapshot) {
+    fun writeCheckpoint(
+        tablePath: String,
+        snapshot: DeltaSnapshot,
+    ) {
         require(snapshot.version >= 0) { "Cannot checkpoint empty table (version=${snapshot.version})" }
         require(snapshot.protocol != null) { "Snapshot must have Protocol for checkpointing" }
         require(snapshot.metaData != null) { "Snapshot must have MetaData for checkpointing" }
@@ -52,15 +56,18 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
 
         writeParquetFile(filePath, records)
 
-        val checkpointInfo = LastCheckpointInfo(
-            version = snapshot.version,
-            size = records.size.toLong()
-        )
+        val checkpointInfo =
+            LastCheckpointInfo(
+                version = snapshot.version,
+                size = records.size.toLong(),
+            )
         logStore.writeLastCheckpoint(tablePath, checkpointInfo.toJson())
 
         logger.info(
             "Checkpoint written: table={}, version={}, actions={}",
-            tablePath, snapshot.version, records.size
+            tablePath,
+            snapshot.version,
+            records.size,
         )
     }
 
@@ -71,7 +78,10 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
      * @param version The checkpoint version to read.
      * @return List of actions from the checkpoint.
      */
-    fun readCheckpoint(tablePath: String, version: Long): List<Action> {
+    fun readCheckpoint(
+        tablePath: String,
+        version: Long,
+    ): List<Action> {
         val filePath = checkpointFilePath(tablePath, version)
         val records = readParquetFile(filePath)
         return records.mapNotNull { convertToAction(it) }
@@ -155,7 +165,7 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
             return SetTransaction(
                 appId = txn.get("appId").toString(),
                 version = txn.get("version") as Long,
-                lastUpdated = txn.get("lastUpdated") as? Long
+                lastUpdated = txn.get("lastUpdated") as? Long,
             )
         }
 
@@ -168,7 +178,7 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
                 modificationTime = add.get("modificationTime") as Long,
                 dataChange = add.get("dataChange") as Boolean,
                 stats = add.get("stats")?.toString(),
-                tags = add.toStringMapOrNull("tags")
+                tags = add.toStringMapOrNull("tags"),
             )
         }
 
@@ -179,14 +189,15 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
                 id = meta.get("id").toString(),
                 name = meta.get("name")?.toString(),
                 description = meta.get("description")?.toString(),
-                format = com.deltaconnect.protocol.actions.Format(
-                    provider = format.get("provider").toString(),
-                    options = format.toStringMap("options")
-                ),
+                format =
+                    com.deltaconnect.protocol.actions.Format(
+                        provider = format.get("provider").toString(),
+                        options = format.toStringMap("options"),
+                    ),
                 schemaString = meta.get("schemaString").toString(),
                 partitionColumns = meta.toStringList("partitionColumns"),
                 configuration = meta.toStringMap("configuration"),
-                createdTime = meta.get("createdTime") as? Long
+                createdTime = meta.get("createdTime") as? Long,
             )
         }
 
@@ -196,7 +207,7 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
                 minReaderVersion = proto.get("minReaderVersion") as Int,
                 minWriterVersion = proto.get("minWriterVersion") as Int,
                 readerFeatures = proto.toStringSetOrNull("readerFeatures"),
-                writerFeatures = proto.toStringSetOrNull("writerFeatures")
+                writerFeatures = proto.toStringSetOrNull("writerFeatures"),
             )
         }
 
@@ -216,21 +227,27 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
             ?.toMap()
 
     @Suppress("UNCHECKED_CAST")
-    private fun GenericRecord.toStringList(field: String): List<String> =
-        (get(field) as List<CharSequence>).map { it.toString() }
+    private fun GenericRecord.toStringList(
+        field: String,
+    ): List<String> = (get(field) as List<CharSequence>).map { it.toString() }
 
     @Suppress("UNCHECKED_CAST")
     private fun GenericRecord.toStringSetOrNull(field: String): Set<String>? =
         (get(field) as? List<CharSequence>)?.map { it.toString() }?.toSet()
 
-    private fun writeParquetFile(filePath: String, records: List<GenericRecord>) {
+    private fun writeParquetFile(
+        filePath: String,
+        records: List<GenericRecord>,
+    ) {
         val outputStream = logStore.createDataFile(filePath)
         val outputFile = OutputStreamBackedOutputFile(outputStream)
 
-        val writer: ParquetWriter<GenericRecord> = AvroParquetWriter.builder<GenericRecord>(outputFile)
-            .withSchema(checkpointSchema)
-            .withCompressionCodec(CompressionCodecName.SNAPPY)
-            .build()
+        val writer: ParquetWriter<GenericRecord> =
+            AvroParquetWriter
+                .builder<GenericRecord>(outputFile)
+                .withSchema(checkpointSchema)
+                .withCompressionCodec(CompressionCodecName.SNAPPY)
+                .build()
 
         writer.use { w ->
             for (record in records) {
@@ -259,90 +276,95 @@ class CheckpointWriter(private val logStore: DeltaLogStore) {
 
         const val DEFAULT_CHECKPOINT_INTERVAL: Long = 10
 
-        fun checkpointFilePath(tablePath: String, version: Long): String =
-            "$tablePath/_delta_log/${ActionSerializer.checkpointFileName(version)}"
+        fun checkpointFilePath(
+            tablePath: String,
+            version: Long,
+        ): String = "$tablePath/_delta_log/${ActionSerializer.checkpointFileName(version)}"
 
-        private fun extractRecordSchema(parentSchema: Schema, fieldName: String): Schema =
-            parentSchema.getField(fieldName).schema().types[1]
+        private fun extractRecordSchema(
+            parentSchema: Schema,
+            fieldName: String,
+        ): Schema = parentSchema.getField(fieldName).schema().types[1]
 
-        private val CHECKPOINT_SCHEMA_JSON = """
-        {
-          "type": "record",
-          "name": "CheckpointRow",
-          "namespace": "com.deltaconnect.protocol.checkpoint",
-          "fields": [
+        private val CHECKPOINT_SCHEMA_JSON =
+            """
             {
-              "name": "txn",
-              "type": ["null", {
-                "type": "record",
-                "name": "SetTransaction",
-                "fields": [
-                  {"name": "appId", "type": "string"},
-                  {"name": "version", "type": "long"},
-                  {"name": "lastUpdated", "type": ["null", "long"], "default": null}
-                ]
-              }],
-              "default": null
-            },
-            {
-              "name": "add",
-              "type": ["null", {
-                "type": "record",
-                "name": "AddFile",
-                "fields": [
-                  {"name": "path", "type": "string"},
-                  {"name": "partitionValues", "type": {"type": "map", "values": "string"}},
-                  {"name": "size", "type": "long"},
-                  {"name": "modificationTime", "type": "long"},
-                  {"name": "dataChange", "type": "boolean"},
-                  {"name": "stats", "type": ["null", "string"], "default": null},
-                  {"name": "tags", "type": ["null", {"type": "map", "values": "string"}], "default": null}
-                ]
-              }],
-              "default": null
-            },
-            {
-              "name": "metaData",
-              "type": ["null", {
-                "type": "record",
-                "name": "MetaData",
-                "fields": [
-                  {"name": "id", "type": "string"},
-                  {"name": "name", "type": ["null", "string"], "default": null},
-                  {"name": "description", "type": ["null", "string"], "default": null},
-                  {"name": "format", "type": {
+              "type": "record",
+              "name": "CheckpointRow",
+              "namespace": "com.deltaconnect.protocol.checkpoint",
+              "fields": [
+                {
+                  "name": "txn",
+                  "type": ["null", {
                     "type": "record",
-                    "name": "Format",
+                    "name": "SetTransaction",
                     "fields": [
-                      {"name": "provider", "type": "string"},
-                      {"name": "options", "type": {"type": "map", "values": "string"}}
+                      {"name": "appId", "type": "string"},
+                      {"name": "version", "type": "long"},
+                      {"name": "lastUpdated", "type": ["null", "long"], "default": null}
                     ]
-                  }},
-                  {"name": "schemaString", "type": "string"},
-                  {"name": "partitionColumns", "type": {"type": "array", "items": "string"}},
-                  {"name": "configuration", "type": {"type": "map", "values": "string"}},
-                  {"name": "createdTime", "type": ["null", "long"], "default": null}
-                ]
-              }],
-              "default": null
-            },
-            {
-              "name": "protocol",
-              "type": ["null", {
-                "type": "record",
-                "name": "Protocol",
-                "fields": [
-                  {"name": "minReaderVersion", "type": "int"},
-                  {"name": "minWriterVersion", "type": "int"},
-                  {"name": "readerFeatures", "type": ["null", {"type": "array", "items": "string"}], "default": null},
-                  {"name": "writerFeatures", "type": ["null", {"type": "array", "items": "string"}], "default": null}
-                ]
-              }],
-              "default": null
+                  }],
+                  "default": null
+                },
+                {
+                  "name": "add",
+                  "type": ["null", {
+                    "type": "record",
+                    "name": "AddFile",
+                    "fields": [
+                      {"name": "path", "type": "string"},
+                      {"name": "partitionValues", "type": {"type": "map", "values": "string"}},
+                      {"name": "size", "type": "long"},
+                      {"name": "modificationTime", "type": "long"},
+                      {"name": "dataChange", "type": "boolean"},
+                      {"name": "stats", "type": ["null", "string"], "default": null},
+                      {"name": "tags", "type": ["null", {"type": "map", "values": "string"}], "default": null}
+                    ]
+                  }],
+                  "default": null
+                },
+                {
+                  "name": "metaData",
+                  "type": ["null", {
+                    "type": "record",
+                    "name": "MetaData",
+                    "fields": [
+                      {"name": "id", "type": "string"},
+                      {"name": "name", "type": ["null", "string"], "default": null},
+                      {"name": "description", "type": ["null", "string"], "default": null},
+                      {"name": "format", "type": {
+                        "type": "record",
+                        "name": "Format",
+                        "fields": [
+                          {"name": "provider", "type": "string"},
+                          {"name": "options", "type": {"type": "map", "values": "string"}}
+                        ]
+                      }},
+                      {"name": "schemaString", "type": "string"},
+                      {"name": "partitionColumns", "type": {"type": "array", "items": "string"}},
+                      {"name": "configuration", "type": {"type": "map", "values": "string"}},
+                      {"name": "createdTime", "type": ["null", "long"], "default": null}
+                    ]
+                  }],
+                  "default": null
+                },
+                {
+                  "name": "protocol",
+                  "type": ["null", {
+                    "type": "record",
+                    "name": "Protocol",
+                    "fields": [
+                      {"name": "minReaderVersion", "type": "int"},
+                      {"name": "minWriterVersion", "type": "int"},
+                      {"name": "readerFeatures", "type": ["null", {"type": "array", "items": "string"}], "default": null},
+                      {"name": "writerFeatures", "type": ["null", {"type": "array", "items": "string"}], "default": null}
+                    ]
+                  }],
+                  "default": null
+                }
+              ]
             }
-          ]
-        }
-        """.trimIndent()
+            """.trimIndent()
 
         val checkpointSchema: Schema = Schema.Parser().parse(CHECKPOINT_SCHEMA_JSON)
         val txnRecordSchema: Schema = extractRecordSchema(checkpointSchema, "txn")

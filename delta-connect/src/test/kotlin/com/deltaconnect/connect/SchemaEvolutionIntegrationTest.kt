@@ -23,44 +23,71 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class SchemaEvolutionIntegrationTest {
-
     @TempDir
     lateinit var tempDir: Path
 
     private lateinit var logStore: LocalFileSystemLogStore
 
-    private val schemaV1 = SchemaBuilder.record("record")
-        .namespace("com.deltaconnect")
-        .fields()
-        .requiredInt("id")
-        .optionalString("name")
-        .name("value").type().nullable().intType().noDefault()
-        .endRecord()
+    private val schemaV1 =
+        SchemaBuilder
+            .record("record")
+            .namespace("com.deltaconnect")
+            .fields()
+            .requiredInt("id")
+            .optionalString("name")
+            .name("value")
+            .type()
+            .nullable()
+            .intType()
+            .noDefault()
+            .endRecord()
 
-    private val schemaV2 = SchemaBuilder.record("record")
-        .namespace("com.deltaconnect")
-        .fields()
-        .requiredInt("id")
-        .optionalString("name")
-        .name("value").type().nullable().intType().noDefault()
-        .optionalString("email")
-        .endRecord()
+    private val schemaV2 =
+        SchemaBuilder
+            .record("record")
+            .namespace("com.deltaconnect")
+            .fields()
+            .requiredInt("id")
+            .optionalString("name")
+            .name("value")
+            .type()
+            .nullable()
+            .intType()
+            .noDefault()
+            .optionalString("email")
+            .endRecord()
 
-    private val schemaV1Wide = SchemaBuilder.record("record")
-        .namespace("com.deltaconnect")
-        .fields()
-        .requiredInt("id")
-        .optionalString("name")
-        .name("value").type().nullable().longType().noDefault()
-        .endRecord()
+    private val schemaV1Wide =
+        SchemaBuilder
+            .record("record")
+            .namespace("com.deltaconnect")
+            .fields()
+            .requiredInt("id")
+            .optionalString("name")
+            .name("value")
+            .type()
+            .nullable()
+            .longType()
+            .noDefault()
+            .endRecord()
 
-    private val schemaIncompat = SchemaBuilder.record("record")
-        .namespace("com.deltaconnect")
-        .fields()
-        .requiredInt("id")
-        .name("name").type().nullable().intType().noDefault()
-        .name("value").type().nullable().intType().noDefault()
-        .endRecord()
+    private val schemaIncompat =
+        SchemaBuilder
+            .record("record")
+            .namespace("com.deltaconnect")
+            .fields()
+            .requiredInt("id")
+            .name("name")
+            .type()
+            .nullable()
+            .intType()
+            .noDefault()
+            .name("value")
+            .type()
+            .nullable()
+            .intType()
+            .noDefault()
+            .endRecord()
 
     @BeforeEach
     fun setUp() {
@@ -69,7 +96,6 @@ class SchemaEvolutionIntegrationTest {
 
     @Nested
     inner class NewNullableColumn {
-
         @Test
         fun `adds new nullable column via schema evolution in append mode`() {
             val writer = appendWriter("test_table", schemaEvolutionEnabled = true)
@@ -104,8 +130,10 @@ class SchemaEvolutionIntegrationTest {
             writer.buffer(
                 SourceRecord(
                     recordV2Data(1, "alice_updated", 100, "alice@test.com"),
-                    MergeOperation.UPDATE
-                ), tp(), 2L
+                    MergeOperation.UPDATE,
+                ),
+                tp(),
+                2L,
             )
             writer.flush()
 
@@ -124,7 +152,6 @@ class SchemaEvolutionIntegrationTest {
 
     @Nested
     inner class TypeWidening {
-
         @Test
         fun `widens INT to LONG via schema evolution`() {
             val writer = appendWriter("test_table", schemaEvolutionEnabled = true)
@@ -143,13 +170,14 @@ class SchemaEvolutionIntegrationTest {
             snapshot.version shouldBe 2L
 
             val deltaSchema = DeltaSchema.fromJson(snapshot.metaData!!.schemaString)
-            deltaSchema.fields.find { it.name == "value" }!!.type.typeName shouldBe "long"
+            deltaSchema.fields
+                .find { it.name == "value" }!!
+                .type.typeName shouldBe "long"
         }
     }
 
     @Nested
     inner class IncompatibleSchema {
-
         @Test
         fun `throws ConnectException for incompatible schema change`() {
             val writer = appendWriter("test_table", schemaEvolutionEnabled = true)
@@ -170,7 +198,6 @@ class SchemaEvolutionIntegrationTest {
 
     @Nested
     inner class EvolutionDisabled {
-
         @Test
         fun `throws ConnectException when evolution disabled and schema changes`() {
             val writer = appendWriter("test_table", schemaEvolutionEnabled = false)
@@ -201,7 +228,6 @@ class SchemaEvolutionIntegrationTest {
 
     @Nested
     inner class RecordProjection {
-
         @Test
         fun `projectRecord fills missing fields with null`() {
             val record = GenericData.Record(schemaV1)
@@ -234,27 +260,33 @@ class SchemaEvolutionIntegrationTest {
 
     private fun mergeWriter(
         tablePath: String,
-        schemaEvolutionEnabled: Boolean = true
-    ): TableWriter = TableWriter(
-        logStore = logStore,
-        tablePath = tablePath,
-        mergeKeys = listOf("id"),
-        writeMode = DeltaSinkConfig.WriteMode.CDC,
-        schemaEvolutionEnabled = schemaEvolutionEnabled
-    )
+        schemaEvolutionEnabled: Boolean = true,
+    ): TableWriter =
+        TableWriter(
+            logStore = logStore,
+            tablePath = tablePath,
+            mergeKeys = listOf("id"),
+            writeMode = DeltaSinkConfig.WriteMode.CDC,
+            schemaEvolutionEnabled = schemaEvolutionEnabled,
+        )
 
     private fun appendWriter(
         tablePath: String,
-        schemaEvolutionEnabled: Boolean = true
-    ): TableWriter = TableWriter(
-        logStore = logStore,
-        tablePath = tablePath,
-        mergeKeys = emptyList(),
-        writeMode = DeltaSinkConfig.WriteMode.APPEND,
-        schemaEvolutionEnabled = schemaEvolutionEnabled
-    )
+        schemaEvolutionEnabled: Boolean = true,
+    ): TableWriter =
+        TableWriter(
+            logStore = logStore,
+            tablePath = tablePath,
+            mergeKeys = emptyList(),
+            writeMode = DeltaSinkConfig.WriteMode.APPEND,
+            schemaEvolutionEnabled = schemaEvolutionEnabled,
+        )
 
-    private fun recordV1(id: Int, name: String, value: Int): SourceRecord {
+    private fun recordV1(
+        id: Int,
+        name: String,
+        value: Int,
+    ): SourceRecord {
         val rec = GenericData.Record(schemaV1)
         rec.put("id", id)
         rec.put("name", name)
@@ -262,11 +294,19 @@ class SchemaEvolutionIntegrationTest {
         return SourceRecord(rec, MergeOperation.INSERT)
     }
 
-    private fun recordV2(id: Int, name: String, value: Int, email: String?): SourceRecord {
-        return SourceRecord(recordV2Data(id, name, value, email), MergeOperation.INSERT)
-    }
+    private fun recordV2(
+        id: Int,
+        name: String,
+        value: Int,
+        email: String?,
+    ): SourceRecord = SourceRecord(recordV2Data(id, name, value, email), MergeOperation.INSERT)
 
-    private fun recordV2Data(id: Int, name: String, value: Int, email: String?): GenericRecord {
+    private fun recordV2Data(
+        id: Int,
+        name: String,
+        value: Int,
+        email: String?,
+    ): GenericRecord {
         val rec = GenericData.Record(schemaV2)
         rec.put("id", id)
         rec.put("name", name)

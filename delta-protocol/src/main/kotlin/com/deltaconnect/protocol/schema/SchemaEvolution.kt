@@ -4,12 +4,19 @@ package com.deltaconnect.protocol.schema
  * Handles Delta table schema evolution: adding nullable columns and widening types.
  */
 object SchemaEvolution {
-
     /** Result of merging a new schema into an existing one. */
     sealed interface MergeResult {
-        data class Evolved(val schema: DeltaType.StructType) : MergeResult
-        data class NoChange(val schema: DeltaType.StructType) : MergeResult
-        data class Incompatible(val reason: String) : MergeResult
+        data class Evolved(
+            val schema: DeltaType.StructType,
+        ) : MergeResult
+
+        data class NoChange(
+            val schema: DeltaType.StructType,
+        ) : MergeResult
+
+        data class Incompatible(
+            val reason: String,
+        ) : MergeResult
     }
 
     /**
@@ -21,7 +28,10 @@ object SchemaEvolution {
      * - Incompatible type changes (e.g., STRING → INT) are rejected.
      * - Columns in [existing] but not in [incoming] are preserved.
      */
-    fun merge(existing: DeltaType.StructType, incoming: DeltaType.StructType): MergeResult {
+    fun merge(
+        existing: DeltaType.StructType,
+        incoming: DeltaType.StructType,
+    ): MergeResult {
         val existingByName = existing.fields.associateBy { it.name }
         val incomingByName = incoming.fields.associateBy { it.name }
         val mergedFields = mutableListOf<StructField>()
@@ -34,11 +44,12 @@ object SchemaEvolution {
                 continue
             }
 
-            val widened = widenType(field.type, incomingField.type)
-                ?: return MergeResult.Incompatible(
-                    "Incompatible type change for column '${field.name}': " +
-                        "${field.type.typeName} → ${incomingField.type.typeName}"
-                )
+            val widened =
+                widenType(field.type, incomingField.type)
+                    ?: return MergeResult.Incompatible(
+                        "Incompatible type change for column '${field.name}': " +
+                            "${field.type.typeName} → ${incomingField.type.typeName}",
+                    )
 
             val mergedNullable = field.nullable || incomingField.nullable
             val mergedField = field.copy(type = widened, nullable = mergedNullable)
@@ -50,7 +61,7 @@ object SchemaEvolution {
             if (field.name !in existingByName) {
                 if (!field.nullable) {
                     return MergeResult.Incompatible(
-                        "New column '${field.name}' must be nullable for schema evolution"
+                        "New column '${field.name}' must be nullable for schema evolution",
                     )
                 }
                 mergedFields.add(field)
@@ -62,7 +73,10 @@ object SchemaEvolution {
         return if (changed) MergeResult.Evolved(result) else MergeResult.NoChange(result)
     }
 
-    private fun widenType(from: DeltaType, to: DeltaType): DeltaType? {
+    private fun widenType(
+        from: DeltaType,
+        to: DeltaType,
+    ): DeltaType? {
         if (from == to) return from
 
         return when {
@@ -80,10 +94,15 @@ object SchemaEvolution {
         }
     }
 
-    private val INT_WIDENABLE = setOf(
-        DeltaType.ShortType, DeltaType.IntegerType, DeltaType.LongType
-    )
-    private val SHORT_WIDENABLE = setOf(
-        DeltaType.IntegerType, DeltaType.LongType
-    )
+    private val INT_WIDENABLE =
+        setOf(
+            DeltaType.ShortType,
+            DeltaType.IntegerType,
+            DeltaType.LongType,
+        )
+    private val SHORT_WIDENABLE =
+        setOf(
+            DeltaType.IntegerType,
+            DeltaType.LongType,
+        )
 }

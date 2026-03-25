@@ -5,5 +5,5 @@ package com.deltaconnect.protocol.actions
  */
 data class Format(
     val provider: String = "parquet",
-    val options: Map<String, String> = emptyMap()
+    val options: Map<String, String> = emptyMap(),
 )

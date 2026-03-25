@@ -18,33 +18,52 @@ import java.net.URI
  * Works with both regular Blob storage accounts and ADLS Gen2 (HNS-enabled) accounts.
  */
 class AzureStorageProvider : StorageProvider {
-
     override fun schemes(): Set<String> = setOf("abfss")
 
-    override fun defineConfig(configDef: ConfigDef): ConfigDef {
-        return configDef
+    override fun defineConfig(configDef: ConfigDef): ConfigDef =
+        configDef
             .define(
-                AZURE_AUTH_TYPE, Type.STRING, AZURE_AUTH_TYPE_DEFAULT,
+                AZURE_AUTH_TYPE,
+                Type.STRING,
+                AZURE_AUTH_TYPE_DEFAULT,
                 ConfigDef.ValidString.`in`("storage_key", "sas_token", "identity"),
-                Importance.HIGH, AZURE_AUTH_TYPE_DOC,
-                AZURE_GROUP, 1, Width.MEDIUM, "Auth Type"
+                Importance.HIGH,
+                AZURE_AUTH_TYPE_DOC,
+                AZURE_GROUP,
+                1,
+                Width.MEDIUM,
+                "Auth Type",
+            ).define(
+                AZURE_STORAGE_ACCOUNT_NAME,
+                Type.STRING,
+                "",
+                Importance.HIGH,
+                AZURE_STORAGE_ACCOUNT_NAME_DOC,
+                AZURE_GROUP,
+                2,
+                Width.LONG,
+                "Storage Account Name",
+            ).define(
+                AZURE_STORAGE_ACCOUNT_KEY,
+                Type.PASSWORD,
+                "",
+                Importance.HIGH,
+                AZURE_STORAGE_ACCOUNT_KEY_DOC,
+                AZURE_GROUP,
+                3,
+                Width.LONG,
+                "Storage Account Key",
+            ).define(
+                AZURE_SAS_TOKEN,
+                Type.PASSWORD,
+                "",
+                Importance.HIGH,
+                AZURE_SAS_TOKEN_DOC,
+                AZURE_GROUP,
+                4,
+                Width.LONG,
+                "SAS Token",
             )
-            .define(
-                AZURE_STORAGE_ACCOUNT_NAME, Type.STRING, "",
-                Importance.HIGH, AZURE_STORAGE_ACCOUNT_NAME_DOC,
-                AZURE_GROUP, 2, Width.LONG, "Storage Account Name"
-            )
-            .define(
-                AZURE_STORAGE_ACCOUNT_KEY, Type.PASSWORD, "",
-                Importance.HIGH, AZURE_STORAGE_ACCOUNT_KEY_DOC,
-                AZURE_GROUP, 3, Width.LONG, "Storage Account Key"
-            )
-            .define(
-                AZURE_SAS_TOKEN, Type.PASSWORD, "",
-                Importance.HIGH, AZURE_SAS_TOKEN_DOC,
-                AZURE_GROUP, 4, Width.LONG, "SAS Token"
-            )
-    }
 
     override fun validate(props: Map<String, String>): List<String> {
         val errors = mutableListOf<String>()
@@ -63,7 +82,7 @@ class AzureStorageProvider : StorageProvider {
                 if (accountKey.isBlank()) {
                     errors.add(
                         "$AZURE_STORAGE_ACCOUNT_KEY is required " +
-                            "when $AZURE_AUTH_TYPE=storage_key"
+                            "when $AZURE_AUTH_TYPE=storage_key",
                     )
                 }
             }
@@ -71,7 +90,7 @@ class AzureStorageProvider : StorageProvider {
                 if (sasToken.isBlank()) {
                     errors.add(
                         "$AZURE_SAS_TOKEN is required " +
-                            "when $AZURE_AUTH_TYPE=sas_token"
+                            "when $AZURE_AUTH_TYPE=sas_token",
                     )
                 }
             }
@@ -84,8 +103,9 @@ class AzureStorageProvider : StorageProvider {
     }
 
     override fun createLogStore(props: Map<String, String>): DeltaLogStore {
-        val storagePath = props["delta.storage.path"]
-            ?: throw IllegalArgumentException("delta.storage.path is required")
+        val storagePath =
+            props["delta.storage.path"]
+                ?: throw IllegalArgumentException("delta.storage.path is required")
 
         val container = parseContainer(storagePath)
         val authType = props[AZURE_AUTH_TYPE] ?: AZURE_AUTH_TYPE_DEFAULT
@@ -93,18 +113,20 @@ class AzureStorageProvider : StorageProvider {
         val accountKey = props[AZURE_STORAGE_ACCOUNT_KEY] ?: ""
         val sasToken = props[AZURE_SAS_TOKEN] ?: ""
 
-        val config = AzureBlobConfig(
-            authType = when (authType) {
-                "storage_key" -> AzureAuthType.STORAGE_KEY
-                "sas_token" -> AzureAuthType.SAS_TOKEN
-                "identity" -> AzureAuthType.IDENTITY
-                else -> AzureAuthType.IDENTITY
-            },
-            accountName = accountName,
-            containerName = container,
-            accountKey = accountKey.ifBlank { null },
-            sasToken = sasToken.ifBlank { null }
-        )
+        val config =
+            AzureBlobConfig(
+                authType =
+                    when (authType) {
+                        "storage_key" -> AzureAuthType.STORAGE_KEY
+                        "sas_token" -> AzureAuthType.SAS_TOKEN
+                        "identity" -> AzureAuthType.IDENTITY
+                        else -> AzureAuthType.IDENTITY
+                    },
+                accountName = accountName,
+                containerName = container,
+                accountKey = accountKey.ifBlank { null },
+                sasToken = sasToken.ifBlank { null },
+            )
 
         return AzureBlobConfigurer.createLogStore(config)
     }

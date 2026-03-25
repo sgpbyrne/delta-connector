@@ -22,8 +22,9 @@ import org.slf4j.LoggerFactory
  * 4. Reconcile: [RemoveFile] cancels the matching [AddFile] by path.
  * 5. Produce a [DeltaSnapshot] with the reconciled active files and latest metadata.
  */
-class TransactionLogReader(private val logStore: DeltaLogStore) {
-
+class TransactionLogReader(
+    private val logStore: DeltaLogStore,
+) {
     private val logger = LoggerFactory.getLogger(TransactionLogReader::class.java)
     private val checkpointWriter = CheckpointWriter(logStore)
 
@@ -41,28 +42,36 @@ class TransactionLogReader(private val logStore: DeltaLogStore) {
         val state = SnapshotState()
 
         val checkpointInfo = readCheckpointInfo(tablePath)
-        val startVersion = if (checkpointInfo != null) {
-            try {
-                val checkpointActions = checkpointWriter.readCheckpoint(tablePath, checkpointInfo.version)
-                for (action in checkpointActions) {
-                    state.applyAction(action)
+        val startVersion =
+            if (checkpointInfo != null) {
+                try {
+                    val checkpointActions = checkpointWriter.readCheckpoint(tablePath, checkpointInfo.version)
+                    for (action in checkpointActions) {
+                        state.applyAction(action)
+                    }
+                    state.latestVersion = checkpointInfo.version
+                    logger.debug(
+                        "Checkpoint loaded: table={}, version={}, actions={}",
+                        tablePath,
+                        checkpointInfo.version,
+                        checkpointActions.size,
+                    )
+                    checkpointInfo.version + 1
+                } catch (
+                    @Suppress("TooGenericExceptionCaught") e: Exception,
+                ) {
+                    // Best-effort checkpoint read — fall back to full log replay on any failure
+                    logger.warn(
+                        "Failed to read checkpoint at version {}: table={}, falling back to full replay",
+                        checkpointInfo.version,
+                        tablePath,
+                        e,
+                    )
+                    0L
                 }
-                state.latestVersion = checkpointInfo.version
-                logger.debug(
-                    "Checkpoint loaded: table={}, version={}, actions={}",
-                    tablePath, checkpointInfo.version, checkpointActions.size
-                )
-                checkpointInfo.version + 1
-            } catch (e: Exception) {
-                logger.warn(
-                    "Failed to read checkpoint at version {}: table={}, falling back to full replay",
-                    checkpointInfo.version, tablePath, e
-                )
+            } else {
                 0L
             }
-        } else {
-            0L
-        }
 
         val versions = logStore.listCommitVersions(tablePath, startVersion)
 
@@ -72,8 +81,9 @@ class TransactionLogReader(private val logStore: DeltaLogStore) {
         }
 
         for (version in versions) {
-            val content = logStore.readCommit(tablePath, version)
-                ?: continue
+            val content =
+                logStore.readCommit(tablePath, version)
+                    ?: continue
 
             val actions = ActionSerializer.deserializeActions(String(content, Charsets.UTF_8))
             for (action in actions) {
@@ -84,8 +94,11 @@ class TransactionLogReader(private val logStore: DeltaLogStore) {
 
         logger.debug(
             "Snapshot reconstructed: table={}, version={}, activeFiles={}, hasMetaData={}, hasProtocol={}",
-            tablePath, state.latestVersion, state.activeFiles.size,
-            state.metaData != null, state.protocol != null
+            tablePath,
+            state.latestVersion,
+            state.activeFiles.size,
+            state.metaData != null,
+            state.protocol != null,
         )
 
         return state.toSnapshot()
@@ -139,13 +152,14 @@ class TransactionLogReader(private val logStore: DeltaLogStore) {
             }
         }
 
-        fun toSnapshot(): DeltaSnapshot = DeltaSnapshot(
-            version = latestVersion,
-            activeFiles = activeFiles.values.toSet(),
-            metaData = metaData,
-            protocol = protocol,
-            transactions = transactions.toMap(),
-            commitInfo = commitInfo
-        )
+        fun toSnapshot(): DeltaSnapshot =
+            DeltaSnapshot(
+                version = latestVersion,
+                activeFiles = activeFiles.values.toSet(),
+                metaData = metaData,
+                protocol = protocol,
+                transactions = transactions.toMap(),
+                commitInfo = commitInfo,
+            )
     }
 }

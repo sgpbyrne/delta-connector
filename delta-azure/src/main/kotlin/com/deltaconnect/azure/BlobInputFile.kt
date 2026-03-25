@@ -22,13 +22,11 @@ import java.nio.ByteBuffer
 internal class BlobInputFile(
     private val blobClient: BlobClient,
     private val fileSize: Long,
-    private val chunkSize: Int = DEFAULT_CHUNK_SIZE
+    private val chunkSize: Int = DEFAULT_CHUNK_SIZE,
 ) : InputFile {
-
     override fun getLength(): Long = fileSize
 
-    override fun newStream(): SeekableInputStream =
-        BlobSeekableInputStream(blobClient, fileSize, chunkSize)
+    override fun newStream(): SeekableInputStream = BlobSeekableInputStream(blobClient, fileSize, chunkSize)
 
     companion object {
         /** Default read-ahead chunk size: 4 MB. */
@@ -45,9 +43,8 @@ internal class BlobInputFile(
 internal class BlobSeekableInputStream(
     private val blobClient: BlobClient,
     private val fileSize: Long,
-    private val chunkSize: Int
+    private val chunkSize: Int,
 ) : SeekableInputStream() {
-
     private var pos: Long = 0
     private var buffer: ByteArray = EMPTY_BUFFER
     private var bufferStart: Long = -1
@@ -56,9 +53,7 @@ internal class BlobSeekableInputStream(
     override fun getPos(): Long = pos
 
     override fun seek(newPos: Long) {
-        if (newPos < 0 || newPos > fileSize) {
-            throw IllegalArgumentException("Seek position $newPos out of range [0, $fileSize]")
-        }
+        require(newPos in 0..fileSize) { "Seek position $newPos out of range [0, $fileSize]" }
         pos = newPos
     }
 
@@ -70,7 +65,11 @@ internal class BlobSeekableInputStream(
         return buffer[idx].toInt() and 0xFF
     }
 
-    override fun read(b: ByteArray, off: Int, len: Int): Int {
+    override fun read(
+        b: ByteArray,
+        off: Int,
+        len: Int,
+    ): Int {
         if (pos >= fileSize) return -1
         val toRead = minOf(len.toLong(), fileSize - pos).toInt()
         var bytesRead = 0
@@ -90,10 +89,14 @@ internal class BlobSeekableInputStream(
         readFully(bytes, 0, bytes.size)
     }
 
-    override fun readFully(bytes: ByteArray, start: Int, len: Int) {
+    override fun readFully(
+        bytes: ByteArray,
+        start: Int,
+        len: Int,
+    ) {
         if (pos + len > fileSize) {
             throw EOFException(
-                "Reached end of stream at position $pos (needed $len bytes, file size $fileSize)"
+                "Reached end of stream at position $pos (needed $len bytes, file size $fileSize)",
             )
         }
         var bytesRead = 0
@@ -128,7 +131,7 @@ internal class BlobSeekableInputStream(
         val len = buf.remaining()
         if (pos + len > fileSize) {
             throw EOFException(
-                "Reached end of stream at position $pos (needed $len bytes, file size $fileSize)"
+                "Reached end of stream at position $pos (needed $len bytes, file size $fileSize)",
             )
         }
         var bytesRead = 0
@@ -143,7 +146,10 @@ internal class BlobSeekableInputStream(
         }
     }
 
-    private fun ensureBuffered(position: Long, minBytes: Int) {
+    private fun ensureBuffered(
+        position: Long,
+        minBytes: Int,
+    ) {
         if (position >= bufferStart && position + minBytes <= bufferStart + bufferLength) {
             return
         }

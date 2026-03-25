@@ -14,17 +14,16 @@ import java.math.BigDecimal
 import java.nio.ByteBuffer
 
 class StatsCollectorTest {
-
     private val objectMapper = jacksonObjectMapper()
 
     @Nested
     inner class NumRecords {
-
         @Test
         fun `zero records`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("id", DeltaType.IntegerType, nullable = false)),
+                )
             val collector = StatsCollector(schema)
 
             val stats = parseStats(collector.toJson())
@@ -33,9 +32,10 @@ class StatsCollectorTest {
 
         @Test
         fun `counts records correctly`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("id", DeltaType.IntegerType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -51,12 +51,12 @@ class StatsCollectorTest {
 
     @Nested
     inner class IntegerStats {
-
         @Test
         fun `tracks min max null count for integers`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("value", DeltaType.IntegerType, nullable = true))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("value", DeltaType.IntegerType, nullable = true)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -74,9 +74,10 @@ class StatsCollectorTest {
 
         @Test
         fun `single value gives same min and max`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("v", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("v", DeltaType.IntegerType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -90,12 +91,12 @@ class StatsCollectorTest {
 
     @Nested
     inner class LongStats {
-
         @Test
         fun `handles Long MIN_VALUE and Long MAX_VALUE`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("big", DeltaType.LongType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("big", DeltaType.LongType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -110,12 +111,12 @@ class StatsCollectorTest {
 
     @Nested
     inner class StringStats {
-
         @Test
         fun `tracks string min max by lexicographic order`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("name", DeltaType.StringType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("name", DeltaType.StringType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -130,9 +131,10 @@ class StatsCollectorTest {
 
         @Test
         fun `min truncates strings longer than 32 chars with plain prefix`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("text", DeltaType.StringType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("text", DeltaType.StringType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -146,9 +148,10 @@ class StatsCollectorTest {
 
         @Test
         fun `max truncates and increments last char for valid upper bound`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("text", DeltaType.StringType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("text", DeltaType.StringType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -163,9 +166,10 @@ class StatsCollectorTest {
 
         @Test
         fun `max truncation handles overflow by trimming trailing max-value chars`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("text", DeltaType.StringType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("text", DeltaType.StringType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -180,9 +184,10 @@ class StatsCollectorTest {
 
         @Test
         fun `does not truncate strings at or below 32 chars`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("text", DeltaType.StringType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("text", DeltaType.StringType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -196,9 +201,10 @@ class StatsCollectorTest {
 
         @Test
         fun `max stat omitted when all chars are max value and string is long`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("text", DeltaType.StringType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("text", DeltaType.StringType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -214,12 +220,12 @@ class StatsCollectorTest {
 
     @Nested
     inner class DateAndTimestampStats {
-
         @Test
         fun `date stats serialized as ISO date strings`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("d", DeltaType.DateType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("d", DeltaType.DateType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -234,9 +240,10 @@ class StatsCollectorTest {
 
         @Test
         fun `timestamp stats serialized as ISO 8601 UTC`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("ts", DeltaType.TimestampType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("ts", DeltaType.TimestampType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -253,9 +260,10 @@ class StatsCollectorTest {
 
         @Test
         fun `negative timestamp (pre-epoch) serialized correctly`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("ts", DeltaType.TimestampType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("ts", DeltaType.TimestampType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -273,12 +281,12 @@ class StatsCollectorTest {
 
     @Nested
     inner class DecimalStats {
-
         @Test
         fun `decimal stats serialized as plain strings`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("amount", DeltaType.DecimalType(10, 2), nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("amount", DeltaType.DecimalType(10, 2), nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -287,12 +295,12 @@ class StatsCollectorTest {
             collector.update(
                 GenericRecordBuilder(avroSchema)
                     .set("amount", ByteBuffer.wrap(dec2.unscaledValue().toByteArray()))
-                    .build()
+                    .build(),
             )
             collector.update(
                 GenericRecordBuilder(avroSchema)
                     .set("amount", ByteBuffer.wrap(dec1.unscaledValue().toByteArray()))
-                    .build()
+                    .build(),
             )
 
             val stats = parseStats(collector.toJson())
@@ -302,9 +310,10 @@ class StatsCollectorTest {
 
         @Test
         fun `negative decimal values ordered correctly`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("amount", DeltaType.DecimalType(10, 2), nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("amount", DeltaType.DecimalType(10, 2), nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -313,12 +322,12 @@ class StatsCollectorTest {
             collector.update(
                 GenericRecordBuilder(avroSchema)
                     .set("amount", ByteBuffer.wrap(pos.unscaledValue().toByteArray()))
-                    .build()
+                    .build(),
             )
             collector.update(
                 GenericRecordBuilder(avroSchema)
                     .set("amount", ByteBuffer.wrap(neg.unscaledValue().toByteArray()))
-                    .build()
+                    .build(),
             )
 
             val stats = parseStats(collector.toJson())
@@ -329,12 +338,12 @@ class StatsCollectorTest {
 
     @Nested
     inner class BooleanStats {
-
         @Test
         fun `boolean min is false, max is true`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("flag", DeltaType.BooleanType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("flag", DeltaType.BooleanType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -349,15 +358,15 @@ class StatsCollectorTest {
 
     @Nested
     inner class ComplexTypeExclusion {
-
         @Test
         fun `binary column excluded from min max`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("data", DeltaType.BinaryType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("data", DeltaType.BinaryType, nullable = true),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -365,7 +374,7 @@ class StatsCollectorTest {
                 GenericRecordBuilder(avroSchema)
                     .set("id", 1)
                     .set("data", ByteBuffer.wrap(byteArrayOf(1, 2, 3)))
-                    .build()
+                    .build(),
             )
 
             val stats = parseStats(collector.toJson())
@@ -376,15 +385,21 @@ class StatsCollectorTest {
 
         @Test
         fun `array and map columns excluded from stats entirely`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("tags", DeltaType.ArrayType(DeltaType.StringType, containsNull = false)),
-                    StructField("props", DeltaType.MapType(
-                        DeltaType.StringType, DeltaType.StringType, valueContainsNull = true
-                    ))
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField("tags", DeltaType.ArrayType(DeltaType.StringType, containsNull = false)),
+                        StructField(
+                            "props",
+                            DeltaType.MapType(
+                                DeltaType.StringType,
+                                DeltaType.StringType,
+                                valueContainsNull = true,
+                            ),
+                        ),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -393,7 +408,7 @@ class StatsCollectorTest {
                     .set("id", 1)
                     .set("tags", listOf("a"))
                     .set("props", mapOf("k" to "v"))
-                    .build()
+                    .build(),
             )
 
             val stats = parseStats(collector.toJson())
@@ -404,12 +419,12 @@ class StatsCollectorTest {
 
     @Nested
     inner class MaxColumnsLimit {
-
         @Test
         fun `limits stats to first 32 columns`() {
-            val fields = (1..40).map { i ->
-                StructField("col_$i", DeltaType.IntegerType, nullable = false)
-            }
+            val fields =
+                (1..40).map { i ->
+                    StructField("col_$i", DeltaType.IntegerType, nullable = false)
+                }
             val schema = DeltaType.StructType(fields)
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
@@ -427,12 +442,12 @@ class StatsCollectorTest {
 
     @Nested
     inner class AllNullColumn {
-
         @Test
         fun `all-null column has null count but no min max`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("value", DeltaType.IntegerType, nullable = true))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("value", DeltaType.IntegerType, nullable = true)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -449,15 +464,15 @@ class StatsCollectorTest {
 
     @Nested
     inner class MultipleColumns {
-
         @Test
         fun `tracks independent stats per column`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("a", DeltaType.IntegerType, nullable = true),
-                    StructField("b", DeltaType.StringType, nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("a", DeltaType.IntegerType, nullable = true),
+                        StructField("b", DeltaType.StringType, nullable = true),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
@@ -478,39 +493,48 @@ class StatsCollectorTest {
 
     @Nested
     inner class NestedStructStats {
-
         @Test
         fun `collects stats on nested struct leaf columns with dot paths`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("address", DeltaType.StructType(
-                        listOf(
-                            StructField("city", DeltaType.StringType, nullable = true),
-                            StructField("zip", DeltaType.IntegerType, nullable = true)
-                        )
-                    ))
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField(
+                            "address",
+                            DeltaType.StructType(
+                                listOf(
+                                    StructField("city", DeltaType.StringType, nullable = true),
+                                    StructField("zip", DeltaType.IntegerType, nullable = true),
+                                ),
+                            ),
+                        ),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
-            val addressSchema = avroSchema.getField("address").schema()
-                .types.first { it.type != org.apache.avro.Schema.Type.NULL }
+            val addressSchema =
+                avroSchema
+                    .getField("address")
+                    .schema()
+                    .types
+                    .first { it.type != org.apache.avro.Schema.Type.NULL }
             val collector = StatsCollector(schema)
 
-            val addr1 = GenericRecordBuilder(addressSchema)
-                .set("city", "Austin")
-                .set("zip", 78701)
-                .build()
-            val addr2 = GenericRecordBuilder(addressSchema)
-                .set("city", "Denver")
-                .set("zip", 80202)
-                .build()
+            val addr1 =
+                GenericRecordBuilder(addressSchema)
+                    .set("city", "Austin")
+                    .set("zip", 78701)
+                    .build()
+            val addr2 =
+                GenericRecordBuilder(addressSchema)
+                    .set("city", "Denver")
+                    .set("zip", 80202)
+                    .build()
 
             collector.update(
-                GenericRecordBuilder(avroSchema).set("id", 1).set("address", addr1).build()
+                GenericRecordBuilder(avroSchema).set("id", 1).set("address", addr1).build(),
             )
             collector.update(
-                GenericRecordBuilder(avroSchema).set("id", 2).set("address", addr2).build()
+                GenericRecordBuilder(avroSchema).set("id", 2).set("address", addr2).build(),
             )
 
             val json = collector.toJson()
@@ -537,21 +561,26 @@ class StatsCollectorTest {
 
         @Test
         fun `handles null nested struct`() {
-            val schema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.IntegerType, nullable = false),
-                    StructField("address", DeltaType.StructType(
-                        listOf(
-                            StructField("city", DeltaType.StringType, nullable = true)
-                        )
-                    ), nullable = true)
+            val schema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.IntegerType, nullable = false),
+                        StructField(
+                            "address",
+                            DeltaType.StructType(
+                                listOf(
+                                    StructField("city", DeltaType.StringType, nullable = true),
+                                ),
+                            ),
+                            nullable = true,
+                        ),
+                    ),
                 )
-            )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 
             collector.update(
-                GenericRecordBuilder(avroSchema).set("id", 1).set("address", null).build()
+                GenericRecordBuilder(avroSchema).set("id", 1).set("address", null).build(),
             )
 
             val json = collector.toJson()
@@ -568,12 +597,12 @@ class StatsCollectorTest {
 
     @Nested
     inner class JsonOutput {
-
         @Test
         fun `produces valid JSON`() {
-            val schema = DeltaType.StructType(
-                listOf(StructField("id", DeltaType.IntegerType, nullable = false))
-            )
+            val schema =
+                DeltaType.StructType(
+                    listOf(StructField("id", DeltaType.IntegerType, nullable = false)),
+                )
             val avroSchema = AvroToDeltaConverter.toAvroSchema(schema)
             val collector = StatsCollector(schema)
 

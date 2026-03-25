@@ -5,7 +5,6 @@ import com.deltaconnect.protocol.actions.ActionSerializer
 import com.deltaconnect.protocol.actions.AddFile
 import com.deltaconnect.protocol.actions.CommitInfo
 import com.deltaconnect.protocol.actions.RemoveFile
-import com.deltaconnect.protocol.actions.SetTransaction
 import com.deltaconnect.protocol.log.CheckpointWriter
 import com.deltaconnect.protocol.log.TransactionLogReader
 import com.deltaconnect.protocol.log.TransactionLogWriter
@@ -30,9 +29,8 @@ class DeltaTransaction internal constructor(
     private val tablePath: String,
     private val logReader: TransactionLogReader,
     private val logWriter: TransactionLogWriter,
-    val readSnapshot: DeltaSnapshot
+    val readSnapshot: DeltaSnapshot,
 ) {
-
     private val actions = mutableListOf<Action>()
 
     /**
@@ -68,20 +66,22 @@ class DeltaTransaction internal constructor(
         operation: String,
         operationParameters: Map<String, String> = emptyMap(),
         engineInfo: String? = null,
-        maxRetries: Int = DEFAULT_MAX_RETRIES
+        maxRetries: Int = DEFAULT_MAX_RETRIES,
     ): Long {
         check(actions.isNotEmpty()) { "Cannot commit an empty transaction" }
 
-        val isBlindAppend = actions.none { it is RemoveFile } &&
-            actions.filterIsInstance<AddFile>().all { it.dataChange }
+        val isBlindAppend =
+            actions.none { it is RemoveFile } &&
+                actions.filterIsInstance<AddFile>().all { it.dataChange }
 
-        val commitInfo = CommitInfo(
-            timestamp = System.currentTimeMillis(),
-            operation = operation,
-            operationParameters = operationParameters,
-            engineInfo = engineInfo,
-            isBlindAppend = isBlindAppend
-        )
+        val commitInfo =
+            CommitInfo(
+                timestamp = System.currentTimeMillis(),
+                operation = operation,
+                operationParameters = operationParameters,
+                engineInfo = engineInfo,
+                isBlindAppend = isBlindAppend,
+            )
 
         val allActions = actions.toList() + commitInfo
 
@@ -94,7 +94,10 @@ class DeltaTransaction internal constructor(
                 logWriter.commit(tablePath, targetVersion, allActions)
                 logger.info(
                     "Transaction committed: table={}, version={}, operation={}, actions={}",
-                    tablePath, targetVersion, operation, allActions.size
+                    tablePath,
+                    targetVersion,
+                    operation,
+                    allActions.size,
                 )
                 tryWriteCheckpoint(targetVersion)
                 return targetVersion
@@ -103,26 +106,34 @@ class DeltaTransaction internal constructor(
                 if (attempt > maxRetries) {
                     logger.warn(
                         "Transaction failed after {} retries: table={}, operation={}",
-                        maxRetries, tablePath, operation
+                        maxRetries,
+                        tablePath,
+                        operation,
                     )
                     throw e
                 }
 
                 logger.debug(
                     "Commit conflict at version {}, attempt {}/{}: table={}",
-                    targetVersion, attempt, maxRetries, tablePath
+                    targetVersion,
+                    attempt,
+                    maxRetries,
+                    tablePath,
                 )
 
                 val latestVersion = logReader.getLatestVersion(tablePath)
 
                 if (!isBlindAppend) {
-                    val ourRemovePaths = actions.filterIsInstance<RemoveFile>()
-                        .map { it.path }
-                        .toSet()
+                    val ourRemovePaths =
+                        actions
+                            .filterIsInstance<RemoveFile>()
+                            .map { it.path }
+                            .toSet()
                     if (hasConflictingPaths(baseVersion, latestVersion, ourRemovePaths)) {
                         logger.warn(
                             "Unresolvable conflict — overlapping file paths: table={}, version={}",
-                            tablePath, targetVersion
+                            tablePath,
+                            targetVersion,
                         )
                         throw e
                     }
@@ -131,7 +142,8 @@ class DeltaTransaction internal constructor(
                 baseVersion = latestVersion
                 logger.debug(
                     "Conflict resolved, rebasing to version {}: table={}",
-                    baseVersion, tablePath
+                    baseVersion,
+                    tablePath,
                 )
             }
         }
@@ -140,7 +152,7 @@ class DeltaTransaction internal constructor(
     private fun hasConflictingPaths(
         fromVersion: Long,
         toVersion: Long,
-        ourRemovePaths: Set<String>
+        ourRemovePaths: Set<String>,
     ): Boolean {
         if (ourRemovePaths.isEmpty()) return false
 
@@ -149,15 +161,17 @@ class DeltaTransaction internal constructor(
             val intermediateActions = ActionSerializer.deserializeActions(String(content, Charsets.UTF_8))
 
             for (action in intermediateActions) {
-                val conflictingPath = when (action) {
-                    is AddFile -> action.path
-                    is RemoveFile -> action.path
-                    else -> null
-                }
+                val conflictingPath =
+                    when (action) {
+                        is AddFile -> action.path
+                        is RemoveFile -> action.path
+                        else -> null
+                    }
                 if (conflictingPath != null && conflictingPath in ourRemovePaths) {
                     logger.debug(
                         "Conflicting path found: path={}, intermediateVersion={}",
-                        conflictingPath, version
+                        conflictingPath,
+                        version,
                     )
                     return true
                 }
@@ -176,10 +190,15 @@ class DeltaTransaction internal constructor(
             val checkpointWriter = CheckpointWriter(logStore)
             val snapshot = logReader.getSnapshot(tablePath)
             checkpointWriter.writeCheckpoint(tablePath, snapshot)
-        } catch (e: Exception) {
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            // Best-effort checkpoint writing — failure should not fail the commit
             logger.warn(
                 "Failed to write checkpoint at version {}: table={}",
-                committedVersion, tablePath, e
+                committedVersion,
+                tablePath,
+                e,
             )
         }
     }

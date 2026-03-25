@@ -1,8 +1,5 @@
 package com.deltaconnect.protocol
 
-import com.deltaconnect.protocol.actions.AddFile
-import com.deltaconnect.protocol.actions.MetaData
-import com.deltaconnect.protocol.actions.RemoveFile
 import com.deltaconnect.protocol.actions.SetTransaction
 import com.deltaconnect.protocol.log.LogTestFixtures
 import com.deltaconnect.protocol.schema.DeltaSchema
@@ -12,11 +9,9 @@ import com.deltaconnect.protocol.storage.LocalFileSystemLogStore
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.longs.shouldBeGreaterThanOrEqual
-import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -24,7 +19,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class DeltaTableTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -32,12 +26,13 @@ class DeltaTableTest {
 
     private val tablePath = "test-table"
 
-    private val simpleSchema = DeltaType.StructType(
-        listOf(
-            StructField("id", DeltaType.IntegerType, nullable = false),
-            StructField("value", DeltaType.StringType, nullable = true)
+    private val simpleSchema =
+        DeltaType.StructType(
+            listOf(
+                StructField("id", DeltaType.IntegerType, nullable = false),
+                StructField("value", DeltaType.StringType, nullable = true),
+            ),
         )
-    )
 
     @BeforeEach
     fun setUp() {
@@ -46,7 +41,6 @@ class DeltaTableTest {
 
     @Nested
     inner class ForPath {
-
         @Test
         fun `returns table handle for non-existent path`() {
             val table = DeltaTable.forPath(logStore, tablePath)
@@ -77,7 +71,6 @@ class DeltaTableTest {
 
     @Nested
     inner class CreateOrReplace {
-
         @Test
         fun `creates new table at version 0`() {
             val table = DeltaTable.createOrReplace(logStore, tablePath, simpleSchema)
@@ -111,10 +104,13 @@ class DeltaTableTest {
 
         @Test
         fun `stores partition columns`() {
-            val table = DeltaTable.createOrReplace(
-                logStore, tablePath, simpleSchema,
-                partitionColumns = listOf("id")
-            )
+            val table =
+                DeltaTable.createOrReplace(
+                    logStore,
+                    tablePath,
+                    simpleSchema,
+                    partitionColumns = listOf("id"),
+                )
             val snapshot = table.snapshot()
 
             snapshot.metaData!!.partitionColumns shouldBe listOf("id")
@@ -123,10 +119,13 @@ class DeltaTableTest {
         @Test
         fun `stores configuration`() {
             val config = mapOf("delta.appendOnly" to "false")
-            val table = DeltaTable.createOrReplace(
-                logStore, tablePath, simpleSchema,
-                configuration = config
-            )
+            val table =
+                DeltaTable.createOrReplace(
+                    logStore,
+                    tablePath,
+                    simpleSchema,
+                    configuration = config,
+                )
             val snapshot = table.snapshot()
 
             snapshot.metaData!!.configuration shouldBe config
@@ -144,10 +143,13 @@ class DeltaTableTest {
 
         @Test
         fun `stores engine info in commit info`() {
-            val table = DeltaTable.createOrReplace(
-                logStore, tablePath, simpleSchema,
-                engineInfo = "delta-cdc-connector/1.0"
-            )
+            val table =
+                DeltaTable.createOrReplace(
+                    logStore,
+                    tablePath,
+                    simpleSchema,
+                    engineInfo = "delta-cdc-connector/1.0",
+                )
             val snapshot = table.snapshot()
 
             snapshot.commitInfo.shouldNotBeNull()
@@ -173,12 +175,13 @@ class DeltaTableTest {
             txn.addAction(LogTestFixtures.addFile("data-001.parquet"))
             txn.commit("WRITE")
 
-            val newSchema = DeltaType.StructType(
-                listOf(
-                    StructField("id", DeltaType.LongType, nullable = false),
-                    StructField("name", DeltaType.StringType, nullable = true)
+            val newSchema =
+                DeltaType.StructType(
+                    listOf(
+                        StructField("id", DeltaType.LongType, nullable = false),
+                        StructField("name", DeltaType.StringType, nullable = true),
+                    ),
                 )
-            )
             val replaced = DeltaTable.createOrReplace(logStore, tablePath, newSchema)
             val snapshot = replaced.snapshot()
 
@@ -193,7 +196,6 @@ class DeltaTableTest {
 
     @Nested
     inner class StartTransaction {
-
         @Test
         fun `returns transaction with current snapshot`() {
             DeltaTable.createOrReplace(logStore, tablePath, simpleSchema)
@@ -215,7 +217,6 @@ class DeltaTableTest {
 
     @Nested
     inner class AppendWorkflow {
-
         @Test
         fun `append files to existing table`() {
             DeltaTable.createOrReplace(logStore, tablePath, simpleSchema)
@@ -253,7 +254,6 @@ class DeltaTableTest {
 
     @Nested
     inner class MergeWorkflow {
-
         @Test
         fun `merge replaces files atomically`() {
             DeltaTable.createOrReplace(logStore, tablePath, simpleSchema)
@@ -281,7 +281,6 @@ class DeltaTableTest {
 
     @Nested
     inner class SetTransactionWorkflow {
-
         @Test
         fun `SetTransaction stored and retrievable via snapshot`() {
             DeltaTable.createOrReplace(logStore, tablePath, simpleSchema)
@@ -293,15 +292,16 @@ class DeltaTableTest {
                 SetTransaction(
                     appId = "delta-cdc-sink-connector-topic0-0",
                     version = 42L,
-                    lastUpdated = System.currentTimeMillis()
-                )
+                    lastUpdated = System.currentTimeMillis(),
+                ),
             )
             txn.commit("MERGE")
 
             val snapshot = table.snapshot()
-            snapshot.transactions shouldBe mapOf(
-                "delta-cdc-sink-connector-topic0-0" to snapshot.transactions["delta-cdc-sink-connector-topic0-0"]!!
-            )
+            snapshot.transactions shouldBe
+                mapOf(
+                    "delta-cdc-sink-connector-topic0-0" to snapshot.transactions["delta-cdc-sink-connector-topic0-0"]!!,
+                )
             snapshot.transactions["delta-cdc-sink-connector-topic0-0"]!!.version shouldBe 42L
         }
 
@@ -347,7 +347,6 @@ class DeltaTableTest {
 
     @Nested
     inner class EndToEnd {
-
         @Test
         fun `create, insert, update, verify`() {
             DeltaTable.createOrReplace(logStore, tablePath, simpleSchema)

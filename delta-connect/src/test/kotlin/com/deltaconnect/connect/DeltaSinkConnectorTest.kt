@@ -4,7 +4,6 @@ import com.deltaconnect.connect.storage.LocalStorageProvider
 import com.deltaconnect.connect.storage.StorageProviderRegistry
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
 import org.apache.kafka.common.config.ConfigException
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 class DeltaSinkConnectorTest {
-
     @TempDir
     lateinit var tempDir: Path
 
@@ -32,11 +30,12 @@ class DeltaSinkConnectorTest {
         StorageProviderRegistry.clear()
     }
 
-    private fun baseProps(): MutableMap<String, String> = mutableMapOf(
-        DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
-        DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
-        DeltaSinkConfig.DELTA_WRITE_MODE to "cdc"
-    )
+    private fun baseProps(): MutableMap<String, String> =
+        mutableMapOf(
+            DeltaSinkConfig.DELTA_STORAGE_PATH to tempDir.toString(),
+            DeltaSinkConfig.DELTA_MERGE_KEYS to "id",
+            DeltaSinkConfig.DELTA_WRITE_MODE to "cdc",
+        )
 
     @Test
     fun `version returns connector version`() {
@@ -87,10 +86,11 @@ class DeltaSinkConnectorTest {
 
     @Test
     fun `validate reports cross-property errors`() {
-        val props = baseProps().apply {
-            put(DeltaSinkConfig.DELTA_WRITE_MODE, "cdc")
-            put(DeltaSinkConfig.DELTA_MERGE_KEYS, "")
-        }
+        val props =
+            baseProps().apply {
+                put(DeltaSinkConfig.DELTA_WRITE_MODE, "cdc")
+                put(DeltaSinkConfig.DELTA_MERGE_KEYS, "")
+            }
         val config = connector.validate(props)
         val allErrors = config.configValues().flatMap { it.errorMessages() }
         allErrors.any { it.contains(DeltaSinkConfig.DELTA_MERGE_KEYS) } shouldBe true
@@ -98,9 +98,10 @@ class DeltaSinkConnectorTest {
 
     @Test
     fun `validate reports unity catalog errors when enabled`() {
-        val props = baseProps().apply {
-            put(DeltaSinkConfig.UNITY_CATALOG_ENABLED, "true")
-        }
+        val props =
+            baseProps().apply {
+                put(DeltaSinkConfig.UNITY_CATALOG_ENABLED, "true")
+            }
         val config = connector.validate(props)
         val allErrors = config.configValues().flatMap { it.errorMessages() }
         allErrors.any { it.contains(DeltaSinkConfig.UNITY_CATALOG_WORKSPACE_URL) } shouldBe true

@@ -25,7 +25,6 @@ import java.io.OutputStream
 import java.time.Duration
 
 class AzureBlobLogStoreTest {
-
     private val containerClient = mockk<BlobContainerClient>()
     private lateinit var logStore: AzureBlobLogStore
 
@@ -36,7 +35,6 @@ class AzureBlobLogStoreTest {
 
     @Nested
     inner class WriteCommit {
-
         @Test
         fun `writes commit with If-None-Match condition`() {
             val blobClient = mockk<BlobClient>()
@@ -101,7 +99,6 @@ class AzureBlobLogStoreTest {
 
     @Nested
     inner class ReadCommit {
-
         @Test
         fun `reads commit content`() {
             val blobClient = mockk<BlobClient>()
@@ -128,14 +125,14 @@ class AzureBlobLogStoreTest {
 
     @Nested
     inner class ListCommitVersions {
-
         @Test
         fun `lists versions sorted ascending`() {
-            val blobItems = listOf(
-                createBlobItem("my-table/_delta_log/00000000000000000002.json"),
-                createBlobItem("my-table/_delta_log/00000000000000000000.json"),
-                createBlobItem("my-table/_delta_log/00000000000000000001.json")
-            )
+            val blobItems =
+                listOf(
+                    createBlobItem("my-table/_delta_log/00000000000000000002.json"),
+                    createBlobItem("my-table/_delta_log/00000000000000000000.json"),
+                    createBlobItem("my-table/_delta_log/00000000000000000001.json"),
+                )
             mockListBlobs(blobItems)
 
             logStore.listCommitVersions("my-table") shouldContainExactly listOf(0L, 1L, 2L)
@@ -143,11 +140,12 @@ class AzureBlobLogStoreTest {
 
         @Test
         fun `filters by startVersion`() {
-            val blobItems = listOf(
-                createBlobItem("my-table/_delta_log/00000000000000000000.json"),
-                createBlobItem("my-table/_delta_log/00000000000000000001.json"),
-                createBlobItem("my-table/_delta_log/00000000000000000002.json")
-            )
+            val blobItems =
+                listOf(
+                    createBlobItem("my-table/_delta_log/00000000000000000000.json"),
+                    createBlobItem("my-table/_delta_log/00000000000000000001.json"),
+                    createBlobItem("my-table/_delta_log/00000000000000000002.json"),
+                )
             mockListBlobs(blobItems)
 
             logStore.listCommitVersions("my-table", 2) shouldContainExactly listOf(2L)
@@ -155,11 +153,12 @@ class AzureBlobLogStoreTest {
 
         @Test
         fun `ignores checkpoint files`() {
-            val blobItems = listOf(
-                createBlobItem("my-table/_delta_log/00000000000000000000.json"),
-                createBlobItem("my-table/_delta_log/00000000000000000010.checkpoint.parquet"),
-                createBlobItem("my-table/_delta_log/00000000000000000001.json")
-            )
+            val blobItems =
+                listOf(
+                    createBlobItem("my-table/_delta_log/00000000000000000000.json"),
+                    createBlobItem("my-table/_delta_log/00000000000000000010.checkpoint.parquet"),
+                    createBlobItem("my-table/_delta_log/00000000000000000001.json"),
+                )
             mockListBlobs(blobItems)
 
             logStore.listCommitVersions("my-table") shouldContainExactly listOf(0L, 1L)
@@ -186,7 +185,6 @@ class AzureBlobLogStoreTest {
 
     @Nested
     inner class CreateDataFile {
-
         @Test
         fun `returns buffered output stream that uploads on close`() {
             val blobClient = mockk<BlobClient>()
@@ -218,7 +216,6 @@ class AzureBlobLogStoreTest {
 
     @Nested
     inner class ReadDataFileAsInputFile {
-
         @Test
         fun `returns InputFile with correct file size`() {
             val blobClient = mockk<BlobClient>()
@@ -234,7 +231,6 @@ class AzureBlobLogStoreTest {
 
     @Nested
     inner class LastCheckpoint {
-
         @Test
         fun `reads last checkpoint content`() {
             val blobClient = mockk<BlobClient>()
@@ -283,7 +279,7 @@ class AzureBlobLogStoreTest {
 
     private fun mockListBlobs(
         items: List<BlobItem>,
-        optionsSlot: io.mockk.CapturingSlot<ListBlobsOptions>? = null
+        optionsSlot: io.mockk.CapturingSlot<ListBlobsOptions>? = null,
     ) {
         val pagedIterable = mockk<PagedIterable<BlobItem>>()
         every { pagedIterable.iterator() } returns items.toMutableList().iterator()

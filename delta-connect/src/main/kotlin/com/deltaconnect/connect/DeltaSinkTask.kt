@@ -40,7 +40,6 @@ import org.slf4j.MDC
  *   [ConnectException] to fail the task.
  */
 class DeltaSinkTask : SinkTask() {
-
     private val log = LoggerFactory.getLogger(DeltaSinkTask::class.java)
 
     private lateinit var config: DeltaSinkConfig
@@ -53,7 +52,7 @@ class DeltaSinkTask : SinkTask() {
     var metrics: ConnectorMetrics = ConnectorMetrics()
 
     private val tableWriters = mutableMapOf<String, TableWriter>()
-    private val tablePaths = mutableMapOf<String, String>()  // topic → tablePath
+    private val tablePaths = mutableMapOf<String, String>() // topic → tablePath
     private val committedOffsets = mutableMapOf<TopicPartition, Long>()
     private var lastFlushTimeMs: Long = 0L
 
@@ -64,7 +63,7 @@ class DeltaSinkTask : SinkTask() {
             DeltaSinkConfig.WriteMode.APPEND -> AppendRecordConverter()
             DeltaSinkConfig.WriteMode.CDC -> DebeziumRecordConverter(cfg.cdcEnvelopeFormat)
             DeltaSinkConfig.WriteMode.UPSERT -> throw UnsupportedOperationException(
-                "UpsertRecordConverter not yet implemented"
+                "UpsertRecordConverter not yet implemented",
             )
         }
     }
@@ -82,43 +81,54 @@ class DeltaSinkTask : SinkTask() {
 
         // ErrantRecordReporter may not be available (older Connect runtimes
         // or errors.tolerance not configured)
-        reporter = try {
-            context.errantRecordReporter()
-        } catch (_: NoSuchMethodError) {
-            null
-        } catch (_: NoClassDefFoundError) {
-            null
-        }
+        reporter =
+            try {
+                context.errantRecordReporter()
+            } catch (_: NoSuchMethodError) {
+                null
+            } catch (_: NoClassDefFoundError) {
+                null
+            }
 
         // Metrics: JMX always on, OTLP opt-in
-        metricsRegistry = MetricsRegistryFactory.create(
-            otlpEndpoint = config.metricsOtlpEndpoint.ifBlank { null }
-        )
+        metricsRegistry =
+            MetricsRegistryFactory.create(
+                otlpEndpoint = config.metricsOtlpEndpoint.ifBlank { null },
+            )
         metrics = ConnectorMetrics(metricsRegistry!!.registry)
 
         // Unity Catalog sync (optional)
         if (config.unityCatalogEnabled) {
-            val client = DatabricksSqlClient(
-                workspaceUrl = config.unityCatalogWorkspaceUrl,
-                warehouseId = config.unityCatalogWarehouseId,
-                tokenSupplier = { config.unityCatalogToken }
+            val client =
+                DatabricksSqlClient(
+                    workspaceUrl = config.unityCatalogWorkspaceUrl,
+                    warehouseId = config.unityCatalogWarehouseId,
+                    tokenSupplier = { config.unityCatalogToken },
+                )
+            catalogSync =
+                UnityCatalogSync(
+                    client = client,
+                    catalog = config.unityCatalogName,
+                    schema = config.unityCatalogSchema,
+                    syncIntervalMs = config.unityCatalogSyncIntervalMs,
+                    clock = clock,
+                )
+            log.info(
+                "Unity Catalog sync enabled: catalog={}, schema={}",
+                config.unityCatalogName,
+                config.unityCatalogSchema,
             )
-            catalogSync = UnityCatalogSync(
-                client = client,
-                catalog = config.unityCatalogName,
-                schema = config.unityCatalogSchema,
-                syncIntervalMs = config.unityCatalogSyncIntervalMs,
-                clock = clock
-            )
-            log.info("Unity Catalog sync enabled: catalog={}, schema={}",
-                config.unityCatalogName, config.unityCatalogSchema)
         }
 
         log.info(
             "DeltaSinkTask started: writeMode={}, batchSize={}, intervalMs={}, " +
                 "schemaEvolution={}, dlqEnabled={}, unityCatalog={}",
-            config.writeMode, config.mergeBatchSize, config.mergeIntervalMs,
-            config.schemaEvolutionEnabled, reporter != null, config.unityCatalogEnabled
+            config.writeMode,
+            config.mergeBatchSize,
+            config.mergeIntervalMs,
+            config.schemaEvolutionEnabled,
+            reporter != null,
+            config.unityCatalogEnabled,
         )
     }
 
@@ -135,7 +145,9 @@ class DeltaSinkTask : SinkTask() {
                 this.committedOffsets[tp] = committedOffset
                 log.info(
                     "Recovered offset: partition={}, committedOffset={}, seekTo={}",
-                    tp, committedOffset, committedOffset + 1
+                    tp,
+                    committedOffset,
+                    committedOffset + 1,
                 )
             }
         }
@@ -148,8 +160,9 @@ class DeltaSinkTask : SinkTask() {
     override fun put(records: Collection<SinkRecord>) {
         if (records.isEmpty()) return
 
-        val effectiveDeleteEnabled = config.mergeDeleteEnabled &&
-            config.writeMode != DeltaSinkConfig.WriteMode.UPSERT
+        val effectiveDeleteEnabled =
+            config.mergeDeleteEnabled &&
+                config.writeMode != DeltaSinkConfig.WriteMode.UPSERT
 
         var convertedCount = 0L
         for (record in records) {
@@ -189,7 +202,7 @@ class DeltaSinkTask : SinkTask() {
     }
 
     override fun preCommit(
-        currentOffsets: Map<TopicPartition, OffsetAndMetadata>
+        currentOffsets: Map<TopicPartition, OffsetAndMetadata>,
     ): Map<TopicPartition, OffsetAndMetadata> {
         if (clock() - lastFlushTimeMs >= config.mergeIntervalMs) {
             flushAll()
@@ -232,16 +245,22 @@ class DeltaSinkTask : SinkTask() {
      */
     private fun convertRecord(
         record: SinkRecord,
-        deleteEnabled: Boolean
-    ): com.deltaconnect.protocol.merge.SourceRecord? {
-        return try {
+        deleteEnabled: Boolean,
+    ): com.deltaconnect.protocol.merge.SourceRecord? =
+        try {
             converter.convert(record, deleteEnabled)
-        } catch (e: Exception) {
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            // Catch broadly to route any conversion failure to DLQ rather than failing the task
             if (reporter != null) {
                 metrics.recordsDlq(record.topic())
                 log.warn(
                     "Record conversion failed, sending to DLQ: topic={}, partition={}, offset={}",
-                    record.topic(), record.kafkaPartition(), record.kafkaOffset(), e
+                    record.topic(),
+                    record.kafkaPartition(),
+                    record.kafkaOffset(),
+                    e,
                 )
                 reporter!!.report(record, e)
                 null
@@ -250,14 +269,13 @@ class DeltaSinkTask : SinkTask() {
                     "Record conversion failed for topic=${record.topic()}, " +
                         "partition=${record.kafkaPartition()}, offset=${record.kafkaOffset()}. " +
                         "Configure errors.tolerance=all and a DLQ topic to skip bad records.",
-                    e
+                    e,
                 )
             }
         }
-    }
 
-    private fun getOrCreateWriter(topic: String): TableWriter {
-        return tableWriters.getOrPut(topic) {
+    private fun getOrCreateWriter(topic: String): TableWriter =
+        tableWriters.getOrPut(topic) {
             val tableName = DeltaSinkConfig.resolveTableName(config.tableName, topic)
             val tablePath = if (basePath.isEmpty()) tableName else "$basePath/$tableName"
             tablePaths[topic] = tablePath
@@ -269,12 +287,14 @@ class DeltaSinkTask : SinkTask() {
                 writeMode = config.writeMode,
                 schemaEvolutionEnabled = config.schemaEvolutionEnabled,
                 topic = topic,
-                metrics = metrics
+                metrics = metrics,
             )
         }
-    }
 
-    private fun flushWriter(topic: String, writer: TableWriter) {
+    private fun flushWriter(
+        topic: String,
+        writer: TableWriter,
+    ) {
         MDC.put("topic", topic)
         MDC.put("tablePath", tablePaths[topic] ?: "")
         try {
@@ -313,20 +333,18 @@ class DeltaSinkTask : SinkTask() {
     }
 
     companion object {
-
         /**
          * Resolve the base path from the storage path using the appropriate
          * storage provider.
          */
-        internal fun resolveBasePath(config: DeltaSinkConfig): String {
-            return try {
+        internal fun resolveBasePath(config: DeltaSinkConfig): String =
+            try {
                 val provider = StorageProviderRegistry.resolve(config.storagePath)
                 provider.parseBasePath(config.storagePath)
             } catch (_: Exception) {
                 // Fallback for plain paths
                 config.storagePath.trimEnd('/')
             }
-        }
 
         /**
          * Create a [DeltaLogStore] via the storage provider resolved from the

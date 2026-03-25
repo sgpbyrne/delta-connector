@@ -17,7 +17,6 @@ import org.apache.kafka.common.config.ConfigDef
  * - `file://` or plain path = Local filesystem (testing)
  */
 interface StorageProvider {
-
     /**
      * URI schemes this provider handles.
      *

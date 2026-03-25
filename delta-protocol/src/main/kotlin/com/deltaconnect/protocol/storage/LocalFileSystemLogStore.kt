@@ -16,9 +16,14 @@ import java.nio.file.StandardOpenOption
  *
  * @param baseDir Root directory for all Delta tables.
  */
-class LocalFileSystemLogStore(private val baseDir: Path) : DeltaLogStore {
-
-    override fun writeCommit(tablePath: String, version: Long, content: ByteArray) {
+class LocalFileSystemLogStore(
+    private val baseDir: Path,
+) : DeltaLogStore {
+    override fun writeCommit(
+        tablePath: String,
+        version: Long,
+        content: ByteArray,
+    ) {
         val logDir = resolveLogDir(tablePath)
         Files.createDirectories(logDir)
         val commitFile = logDir.resolve(ActionSerializer.commitFileName(version))
@@ -29,12 +34,18 @@ class LocalFileSystemLogStore(private val baseDir: Path) : DeltaLogStore {
         }
     }
 
-    override fun readCommit(tablePath: String, version: Long): ByteArray? {
+    override fun readCommit(
+        tablePath: String,
+        version: Long,
+    ): ByteArray? {
         val commitFile = resolveLogDir(tablePath).resolve(ActionSerializer.commitFileName(version))
         return if (Files.exists(commitFile)) Files.readAllBytes(commitFile) else null
     }
 
-    override fun listCommitVersions(tablePath: String, startVersion: Long): List<Long> {
+    override fun listCommitVersions(
+        tablePath: String,
+        startVersion: Long,
+    ): List<Long> {
         val logDir = resolveLogDir(tablePath)
         if (!Files.exists(logDir)) return emptyList()
 
@@ -66,17 +77,19 @@ class LocalFileSystemLogStore(private val baseDir: Path) : DeltaLogStore {
         return if (Files.exists(file)) Files.readString(file) else null
     }
 
-    override fun writeLastCheckpoint(tablePath: String, content: String) {
+    override fun writeLastCheckpoint(
+        tablePath: String,
+        content: String,
+    ) {
         val logDir = resolveLogDir(tablePath)
         Files.createDirectories(logDir)
         Files.writeString(
             logDir.resolve("_last_checkpoint"),
             content,
             StandardOpenOption.CREATE,
-            StandardOpenOption.TRUNCATE_EXISTING
+            StandardOpenOption.TRUNCATE_EXISTING,
         )
     }
 
-    private fun resolveLogDir(tablePath: String): Path =
-        baseDir.resolve(tablePath).resolve("_delta_log")
+    private fun resolveLogDir(tablePath: String): Path = baseDir.resolve(tablePath).resolve("_delta_log")
 }
