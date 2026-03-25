@@ -19,4 +19,11 @@ dependencies {
         exclude(group = "org.eclipse.jetty")
     }
     testImplementation(libs.slf4j.simple)
+
+    "integrationTestImplementation"(project(":delta-azure"))
+    "integrationTestImplementation"(libs.testcontainers.core)
+    "integrationTestImplementation"(libs.testcontainers.junit)
+    "integrationTestImplementation"(libs.testcontainers.kafka)
+    "integrationTestImplementation"("org.apache.kafka:kafka-clients:${libs.versions.kafka.get()}")
+    "integrationTestImplementation"(libs.slf4j.simple)
 }

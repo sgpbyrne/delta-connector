@@ -50,7 +50,7 @@ class DeltaSinkTask : SinkTask() {
     private var reporter: ErrantRecordReporter? = null
     private var catalogSync: UnityCatalogSync? = null
     private var metricsRegistry: CloseableMeterRegistry? = null
-    internal var metrics: ConnectorMetrics = ConnectorMetrics()
+    var metrics: ConnectorMetrics = ConnectorMetrics()
 
     private val tableWriters = mutableMapOf<String, TableWriter>()
     private val tablePaths = mutableMapOf<String, String>()  // topic → tablePath
@@ -58,8 +58,8 @@ class DeltaSinkTask : SinkTask() {
     private var lastFlushTimeMs: Long = 0L
 
     // Visible for testing: allows injecting custom factories
-    internal var logStoreFactory: (DeltaSinkConfig) -> DeltaLogStore = ::createLogStoreFromProvider
-    internal var converterFactory: (DeltaSinkConfig) -> RecordConverter = { cfg ->
+    var logStoreFactory: (DeltaSinkConfig) -> DeltaLogStore = ::createLogStoreFromProvider
+    var converterFactory: (DeltaSinkConfig) -> RecordConverter = { cfg ->
         when (cfg.writeMode) {
             DeltaSinkConfig.WriteMode.APPEND -> AppendRecordConverter()
             DeltaSinkConfig.WriteMode.CDC -> DebeziumRecordConverter(cfg.cdcEnvelopeFormat)
@@ -68,7 +68,7 @@ class DeltaSinkTask : SinkTask() {
             )
         }
     }
-    internal var clock: () -> Long = System::currentTimeMillis
+    var clock: () -> Long = System::currentTimeMillis
 
     override fun version(): String = DeltaSinkConnector.VERSION
 

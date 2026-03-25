@@ -1,7 +1,7 @@
 package com.deltaconnect.azure
 
-import com.azure.storage.file.datalake.DataLakeFileClient
-import com.azure.storage.file.datalake.models.FileRange
+import com.azure.storage.blob.BlobClient
+import com.azure.storage.blob.models.BlobRange
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -13,15 +13,15 @@ import java.io.EOFException
 import java.io.OutputStream
 import java.nio.ByteBuffer
 
-class AdlsInputFileTest {
+class BlobInputFileTest {
 
     @Nested
     inner class Length {
 
         @Test
         fun `returns file size`() {
-            val fileClient = mockk<DataLakeFileClient>()
-            val inputFile = AdlsInputFile(fileClient, 1024L)
+            val blobClient = mockk<BlobClient>()
+            val inputFile = BlobInputFile(blobClient, 1024L)
             inputFile.length shouldBe 1024L
         }
     }
@@ -32,8 +32,8 @@ class AdlsInputFileTest {
         @Test
         fun `reads single bytes sequentially`() {
             val data = byteArrayOf(0x41, 0x42, 0x43) // A, B, C
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 1024)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 1024)
 
             inputFile.newStream().use { stream ->
                 stream.read() shouldBe 0x41
@@ -46,8 +46,8 @@ class AdlsInputFileTest {
         @Test
         fun `seeks to position and reads`() {
             val data = "ABCDEFGH".toByteArray()
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 1024)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 1024)
 
             inputFile.newStream().use { stream ->
                 stream.seek(4)
@@ -60,8 +60,8 @@ class AdlsInputFileTest {
         @Test
         fun `reads bulk bytes`() {
             val data = "Hello, World!".toByteArray()
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 1024)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 1024)
 
             inputFile.newStream().use { stream ->
                 val buf = ByteArray(5)
@@ -74,8 +74,8 @@ class AdlsInputFileTest {
         @Test
         fun `readFully reads exact number of bytes`() {
             val data = "ABCDEFGH".toByteArray()
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 1024)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 1024)
 
             inputFile.newStream().use { stream ->
                 val buf = ByteArray(4)
@@ -87,8 +87,8 @@ class AdlsInputFileTest {
         @Test
         fun `readFully throws EOFException when not enough data`() {
             val data = "AB".toByteArray()
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 1024)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 1024)
 
             inputFile.newStream().use { stream ->
                 val buf = ByteArray(10)
@@ -101,8 +101,8 @@ class AdlsInputFileTest {
         @Test
         fun `reads across chunk boundaries`() {
             val data = "ABCDEFGHIJKLMNOP".toByteArray() // 16 bytes
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 4)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 4)
 
             inputFile.newStream().use { stream ->
                 val buf = ByteArray(8)
@@ -114,8 +114,8 @@ class AdlsInputFileTest {
         @Test
         fun `seek invalidates buffer and fetches new chunk`() {
             val data = "0123456789ABCDEF".toByteArray() // 16 bytes
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 4)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 4)
 
             inputFile.newStream().use { stream ->
                 stream.read() shouldBe '0'.code
@@ -127,8 +127,8 @@ class AdlsInputFileTest {
         @Test
         fun `reads into ByteBuffer`() {
             val data = "Hello".toByteArray()
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 1024)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 1024)
 
             inputFile.newStream().use { stream ->
                 val buf = ByteBuffer.allocate(5)
@@ -143,8 +143,8 @@ class AdlsInputFileTest {
         @Test
         fun `readFully into ByteBuffer`() {
             val data = "World".toByteArray()
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 1024)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 1024)
 
             inputFile.newStream().use { stream ->
                 val buf = ByteBuffer.allocate(5)
@@ -159,8 +159,8 @@ class AdlsInputFileTest {
         @Test
         fun `returns -1 when reading past end`() {
             val data = "A".toByteArray()
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 1024)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 1024)
 
             inputFile.newStream().use { stream ->
                 stream.read() shouldBe 'A'.code
@@ -171,8 +171,8 @@ class AdlsInputFileTest {
         @Test
         fun `seek to end position is valid`() {
             val data = "AB".toByteArray()
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 1024)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 1024)
 
             inputFile.newStream().use { stream ->
                 stream.seek(2) // seek to end
@@ -184,8 +184,8 @@ class AdlsInputFileTest {
         @Test
         fun `seek to invalid position throws`() {
             val data = "AB".toByteArray()
-            val fileClient = mockFileClient(data)
-            val inputFile = AdlsInputFile(fileClient, data.size.toLong(), chunkSize = 1024)
+            val blobClient = mockBlobClient(data)
+            val inputFile = BlobInputFile(blobClient, data.size.toLong(), chunkSize = 1024)
 
             inputFile.newStream().use { stream ->
                 shouldThrow<IllegalArgumentException> {
@@ -198,12 +198,12 @@ class AdlsInputFileTest {
         }
     }
 
-    private fun mockFileClient(data: ByteArray): DataLakeFileClient {
-        val fileClient = mockk<DataLakeFileClient>()
-        val rangeSlot = slot<FileRange>()
+    private fun mockBlobClient(data: ByteArray): BlobClient {
+        val blobClient = mockk<BlobClient>()
+        val rangeSlot = slot<BlobRange>()
 
         every {
-            fileClient.readWithResponse(any<OutputStream>(), capture(rangeSlot), any(), any(), any(), any(), any())
+            blobClient.downloadStreamWithResponse(any<OutputStream>(), capture(rangeSlot), any(), any(), any(), any(), any())
         } answers {
             val outputStream = firstArg<OutputStream>()
             val range = rangeSlot.captured
@@ -213,6 +213,6 @@ class AdlsInputFileTest {
             mockk()
         }
 
-        return fileClient
+        return blobClient
     }
 }

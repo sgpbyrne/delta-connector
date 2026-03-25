@@ -30,6 +30,36 @@ subprojects {
         "testRuntimeOnly"("org.junit.platform:junit-platform-launcher")
     }
 
+    // Integration test source set (separate from unit tests, uses Testcontainers)
+    val main = the<SourceSetContainer>()["main"]
+    val test = the<SourceSetContainer>()["test"]
+
+    val integrationTest = the<SourceSetContainer>().create("integrationTest") {
+        compileClasspath += main.output + test.output
+        runtimeClasspath += main.output + test.output
+    }
+
+    configurations[integrationTest.implementationConfigurationName]
+        .extendsFrom(configurations[test.implementationConfigurationName])
+    configurations[integrationTest.runtimeOnlyConfigurationName]
+        .extendsFrom(configurations[test.runtimeOnlyConfigurationName])
+
+    // Make integrationTest a friend of main (allows access to internal members)
+    tasks.matching { it.name == "compileIntegrationTestKotlin" }.configureEach {
+        (this as org.jetbrains.kotlin.gradle.tasks.KotlinCompile).compilerOptions {
+            freeCompilerArgs.add("-Xfriend-paths=${main.output.classesDirs.asPath}")
+        }
+    }
+
+    tasks.register<Test>("integrationTest") {
+        description = "Runs integration tests with Testcontainers."
+        group = "verification"
+        testClassesDirs = integrationTest.output.classesDirs
+        classpath = integrationTest.runtimeClasspath
+        useJUnitPlatform()
+        shouldRunAfter(tasks.named("test"))
+    }
+
     apply(plugin = "jacoco")
 
     tasks.withType<Test> {
@@ -56,7 +86,7 @@ subprojects {
     }
 
     tasks.withType<JacocoReport> {
-        dependsOn(tasks.withType<Test>())
+        dependsOn(tasks.named("test"))
         reports {
             xml.required.set(true)
             html.required.set(true)

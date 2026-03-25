@@ -1,14 +1,14 @@
 package com.deltaconnect.azure
 
 import com.azure.identity.DefaultAzureCredentialBuilder
+import com.azure.storage.blob.BlobContainerClient
+import com.azure.storage.blob.BlobServiceClientBuilder
 import com.azure.storage.common.StorageSharedKeyCredential
-import com.azure.storage.file.datalake.DataLakeFileSystemClient
-import com.azure.storage.file.datalake.DataLakeServiceClientBuilder
 
 /**
- * Authentication type for ADLS Gen2 access.
+ * Authentication type for Azure Blob Storage access.
  */
-enum class AdlsAuthType {
+enum class AzureAuthType {
     /** Storage account name + key. */
     STORAGE_KEY,
     /** Shared Access Signature token. */
@@ -18,72 +18,72 @@ enum class AdlsAuthType {
 }
 
 /**
- * Configuration for connecting to an ADLS Gen2 storage account.
+ * Configuration for connecting to an Azure Blob Storage account.
  *
  * @param authType Authentication method.
  * @param accountName Azure storage account name.
- * @param fileSystemName ADLS Gen2 filesystem (container) name.
- * @param accountKey Storage account key (required for [AdlsAuthType.STORAGE_KEY]).
- * @param sasToken SAS token (required for [AdlsAuthType.SAS_TOKEN]).
- * @param endpoint Override endpoint URL. If null, defaults to `https://{accountName}.dfs.core.windows.net`.
+ * @param containerName Blob container name.
+ * @param accountKey Storage account key (required for [AzureAuthType.STORAGE_KEY]).
+ * @param sasToken SAS token (required for [AzureAuthType.SAS_TOKEN]).
+ * @param endpoint Override endpoint URL. If null, defaults to `https://{accountName}.blob.core.windows.net`.
  */
-data class AdlsAuthConfig(
-    val authType: AdlsAuthType,
+data class AzureBlobConfig(
+    val authType: AzureAuthType,
     val accountName: String,
-    val fileSystemName: String,
+    val containerName: String,
     val accountKey: String? = null,
     val sasToken: String? = null,
     val endpoint: String? = null
 )
 
 /**
- * Builds an [AdlsGen2LogStore] from an [AdlsAuthConfig].
+ * Builds an [AzureBlobLogStore] from an [AzureBlobConfig].
  */
-object AdlsAuthConfigurer {
+object AzureBlobConfigurer {
 
     /**
-     * Create a [DataLakeFileSystemClient] from the given configuration.
+     * Create a [BlobContainerClient] from the given configuration.
      *
      * @param config Authentication and connection configuration.
-     * @return Configured filesystem client ready for use with [AdlsGen2LogStore].
+     * @return Configured blob container client ready for use with [AzureBlobLogStore].
      * @throws IllegalArgumentException if required credentials are missing for the auth type.
      */
-    fun createFileSystemClient(config: AdlsAuthConfig): DataLakeFileSystemClient {
+    fun createContainerClient(config: AzureBlobConfig): BlobContainerClient {
         val endpoint = config.endpoint
-            ?: "https://${config.accountName}.dfs.core.windows.net"
+            ?: "https://${config.accountName}.blob.core.windows.net"
 
-        val builder = DataLakeServiceClientBuilder().endpoint(endpoint)
+        val builder = BlobServiceClientBuilder().endpoint(endpoint)
 
         when (config.authType) {
-            AdlsAuthType.STORAGE_KEY -> {
+            AzureAuthType.STORAGE_KEY -> {
                 requireNotNull(config.accountKey) {
                     "accountKey is required for STORAGE_KEY auth type"
                 }
                 val credential = StorageSharedKeyCredential(config.accountName, config.accountKey)
                 builder.credential(credential)
             }
-            AdlsAuthType.SAS_TOKEN -> {
+            AzureAuthType.SAS_TOKEN -> {
                 requireNotNull(config.sasToken) {
                     "sasToken is required for SAS_TOKEN auth type"
                 }
                 builder.sasToken(config.sasToken)
             }
-            AdlsAuthType.IDENTITY -> {
+            AzureAuthType.IDENTITY -> {
                 builder.credential(DefaultAzureCredentialBuilder().build())
             }
         }
 
-        return builder.buildClient().getFileSystemClient(config.fileSystemName)
+        return builder.buildClient().getBlobContainerClient(config.containerName)
     }
 
     /**
-     * Create an [AdlsGen2LogStore] from the given configuration.
+     * Create an [AzureBlobLogStore] from the given configuration.
      *
      * @param config Authentication and connection configuration.
      * @return Configured log store.
      */
-    fun createLogStore(config: AdlsAuthConfig): AdlsGen2LogStore {
-        val fileSystemClient = createFileSystemClient(config)
-        return AdlsGen2LogStore(fileSystemClient)
+    fun createLogStore(config: AzureBlobConfig): AzureBlobLogStore {
+        val containerClient = createContainerClient(config)
+        return AzureBlobLogStore(containerClient)
     }
 }

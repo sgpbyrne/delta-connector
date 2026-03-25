@@ -1,6 +1,6 @@
 dependencies {
     implementation(project(":delta-protocol"))
-    implementation(libs.azure.storage.datalake)
+    implementation(libs.azure.storage.blob)
     implementation(libs.azure.identity)
     implementation(libs.bundles.jackson)
     implementation(libs.bundles.parquet)
@@ -12,4 +12,10 @@ dependencies {
     testImplementation(project(":delta-connect"))
     testImplementation(libs.kafka.connect.api)
     testImplementation(libs.slf4j.simple)
+
+    "integrationTestImplementation"(libs.testcontainers.core)
+    "integrationTestImplementation"(libs.testcontainers.junit)
+    "integrationTestImplementation"(libs.hadoop.common)
+    "integrationTestImplementation"(libs.hadoop.mapreduce.client.core)
+    "integrationTestImplementation"(libs.slf4j.simple)
 }

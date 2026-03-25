@@ -1,10 +1,10 @@
 package com.deltaconnect.azure
 
-import com.azure.storage.file.datalake.DataLakeFileSystemClient
-import com.azure.storage.file.datalake.models.DataLakeRequestConditions
-import com.azure.storage.file.datalake.models.DataLakeStorageException
-import com.azure.storage.file.datalake.models.ListPathsOptions
-import com.azure.storage.file.datalake.options.FileParallelUploadOptions
+import com.azure.storage.blob.BlobContainerClient
+import com.azure.storage.blob.models.BlobRequestConditions
+import com.azure.storage.blob.models.BlobStorageException
+import com.azure.storage.blob.models.ListBlobsOptions
+import com.azure.storage.blob.options.BlobParallelUploadOptions
 import com.deltaconnect.protocol.actions.ActionSerializer
 import com.deltaconnect.protocol.storage.CommitConflictException
 import com.deltaconnect.protocol.storage.DeltaLogStore
@@ -15,30 +15,29 @@ import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 
 /**
- * Azure ADLS Gen2 implementation of [DeltaLogStore].
+ * Azure Blob Storage implementation of [DeltaLogStore].
  *
- * Uses the Azure Data Lake Storage SDK for all I/O.
- * Atomic commit semantics are provided via conditional creates,
- * leveraging ADLS Gen2's Hierarchical Namespace for atomic file creation.
+ * Atomic commit semantics are provided via conditional creates using
+ * `If-None-Match: *`, which returns 409/412 if the blob already exists.
  *
- * @param fileSystemClient Azure Data Lake filesystem client (container-level).
+ * @param containerClient Azure Blob container client.
  */
-class AdlsGen2LogStore(
-    private val fileSystemClient: DataLakeFileSystemClient
+class AzureBlobLogStore(
+    private val containerClient: BlobContainerClient
 ) : DeltaLogStore {
 
     override fun writeCommit(tablePath: String, version: Long, content: ByteArray) {
         val filePath = commitPath(tablePath, version)
-        val fileClient = fileSystemClient.getFileClient(filePath)
+        val blobClient = containerClient.getBlobClient(filePath)
 
-        val conditions = DataLakeRequestConditions().setIfNoneMatch("*")
-        val options = FileParallelUploadOptions(ByteArrayInputStream(content))
+        val conditions = BlobRequestConditions().setIfNoneMatch("*")
+        val options = BlobParallelUploadOptions(ByteArrayInputStream(content))
             .setRequestConditions(conditions)
 
         try {
-            fileClient.uploadWithResponse(options, null, null)
+            blobClient.uploadWithResponse(options, null, null)
             logger.debug("Commit written: table={}, version={}, size={}", tablePath, version, content.size)
-        } catch (e: DataLakeStorageException) {
+        } catch (e: BlobStorageException) {
             if (e.statusCode == 409 || e.statusCode == 412) {
                 throw CommitConflictException(tablePath, version)
             }
@@ -54,31 +53,31 @@ class AdlsGen2LogStore(
     override fun listCommitVersions(tablePath: String, startVersion: Long): List<Long> {
         val logDir = "$tablePath/_delta_log/"
 
-        val options = ListPathsOptions().setPath(logDir).setRecursive(false)
+        val options = ListBlobsOptions().setPrefix(logDir)
 
         return try {
-            fileSystemClient.listPaths(options, null)
+            containerClient.listBlobs(options, null)
                 .asSequence()
-                .map { pathItem -> pathItem.name.substringAfterLast('/') }
+                .map { blobItem -> blobItem.name.substringAfterLast('/') }
                 .filter { name -> name.endsWith(".json") && !name.contains("checkpoint") }
                 .mapNotNull { name -> name.removeSuffix(".json").toLongOrNull() }
                 .filter { version -> version >= startVersion }
                 .sorted()
                 .toList()
-        } catch (e: DataLakeStorageException) {
+        } catch (e: BlobStorageException) {
             if (e.statusCode == 404) emptyList() else throw e
         }
     }
 
     override fun createDataFile(filePath: String): OutputStream {
-        return AdlsBufferedOutputStream(fileSystemClient, filePath)
+        return AzureBlobBufferedOutputStream(containerClient, filePath)
     }
 
     override fun readDataFileAsInputFile(filePath: String): InputFile {
-        val fileClient = fileSystemClient.getFileClient(filePath)
-        val properties = fileClient.properties
-        val fileSize = properties.fileSize
-        return AdlsInputFile(fileClient, fileSize)
+        val blobClient = containerClient.getBlobClient(filePath)
+        val properties = blobClient.properties
+        val fileSize = properties.blobSize
+        return BlobInputFile(blobClient, fileSize)
     }
 
     override fun readLastCheckpoint(tablePath: String): String? {
@@ -89,19 +88,19 @@ class AdlsGen2LogStore(
 
     override fun writeLastCheckpoint(tablePath: String, content: String) {
         val filePath = "$tablePath/_delta_log/_last_checkpoint"
-        val fileClient = fileSystemClient.getFileClient(filePath)
+        val blobClient = containerClient.getBlobClient(filePath)
         val bytes = content.toByteArray(Charsets.UTF_8)
-        val options = FileParallelUploadOptions(ByteArrayInputStream(bytes))
-        fileClient.uploadWithResponse(options, null, null)
+        val options = BlobParallelUploadOptions(ByteArrayInputStream(bytes))
+        blobClient.uploadWithResponse(options, null, null)
     }
 
     private fun readFileBytes(filePath: String): ByteArray? {
-        val fileClient = fileSystemClient.getFileClient(filePath)
+        val blobClient = containerClient.getBlobClient(filePath)
         return try {
             val outputStream = ByteArrayOutputStream()
-            fileClient.read(outputStream)
+            blobClient.downloadStream(outputStream)
             outputStream.toByteArray()
-        } catch (e: DataLakeStorageException) {
+        } catch (e: BlobStorageException) {
             if (e.statusCode == 404) null else throw e
         }
     }
@@ -110,19 +109,18 @@ class AdlsGen2LogStore(
         "$tablePath/_delta_log/${ActionSerializer.commitFileName(version)}"
 
     companion object {
-        private val logger = LoggerFactory.getLogger(AdlsGen2LogStore::class.java)
+        private val logger = LoggerFactory.getLogger(AzureBlobLogStore::class.java)
     }
 }
 
 /**
  * Buffered output stream that accumulates bytes in memory and uploads
- * to ADLS Gen2 on [close].
+ * to Azure Blob Storage on [close].
  *
- * This ensures that data files are written atomically (the file is only
- * visible after the full content is uploaded).
+ * This ensures that data files are written atomically.
  */
-internal class AdlsBufferedOutputStream(
-    private val fileSystemClient: DataLakeFileSystemClient,
+internal class AzureBlobBufferedOutputStream(
+    private val containerClient: BlobContainerClient,
     private val filePath: String
 ) : OutputStream() {
 
@@ -146,8 +144,8 @@ internal class AdlsBufferedOutputStream(
         closed = true
 
         val bytes = buffer.toByteArray()
-        val fileClient = fileSystemClient.getFileClient(filePath)
-        val options = FileParallelUploadOptions(ByteArrayInputStream(bytes))
-        fileClient.uploadWithResponse(options, null, null)
+        val blobClient = containerClient.getBlobClient(filePath)
+        val options = BlobParallelUploadOptions(ByteArrayInputStream(bytes))
+        blobClient.uploadWithResponse(options, null, null)
     }
 }

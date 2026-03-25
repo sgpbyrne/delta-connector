@@ -1,7 +1,7 @@
 package com.deltaconnect.azure
 
-import com.azure.storage.file.datalake.DataLakeFileClient
-import com.azure.storage.file.datalake.models.FileRange
+import com.azure.storage.blob.BlobClient
+import com.azure.storage.blob.models.BlobRange
 import org.apache.parquet.io.InputFile
 import org.apache.parquet.io.SeekableInputStream
 import java.io.ByteArrayOutputStream
@@ -9,18 +9,18 @@ import java.io.EOFException
 import java.nio.ByteBuffer
 
 /**
- * Parquet [InputFile] backed by Azure ADLS Gen2 HTTP range reads.
+ * Parquet [InputFile] backed by Azure Blob Storage HTTP range reads.
  *
- * Each call to [newStream] creates a new [AdlsSeekableInputStream] that fetches
+ * Each call to [newStream] creates a new [BlobSeekableInputStream] that fetches
  * data in configurable chunks (default 4 MB) to reduce HTTP round trips while
  * keeping memory usage bounded.
  *
- * @param fileClient Azure file client for the target file.
- * @param fileSize Total file size in bytes.
+ * @param blobClient Azure Blob client for the target blob.
+ * @param fileSize Total blob size in bytes.
  * @param chunkSize Read-ahead buffer size in bytes (default 4 MB).
  */
-internal class AdlsInputFile(
-    private val fileClient: DataLakeFileClient,
+internal class BlobInputFile(
+    private val blobClient: BlobClient,
     private val fileSize: Long,
     private val chunkSize: Int = DEFAULT_CHUNK_SIZE
 ) : InputFile {
@@ -28,7 +28,7 @@ internal class AdlsInputFile(
     override fun getLength(): Long = fileSize
 
     override fun newStream(): SeekableInputStream =
-        AdlsSeekableInputStream(fileClient, fileSize, chunkSize)
+        BlobSeekableInputStream(blobClient, fileSize, chunkSize)
 
     companion object {
         /** Default read-ahead chunk size: 4 MB. */
@@ -37,14 +37,13 @@ internal class AdlsInputFile(
 }
 
 /**
- * Seekable input stream that fetches data from ADLS Gen2 via HTTP range reads.
+ * Seekable input stream that fetches data from Azure Blob Storage via HTTP range reads.
  *
  * Maintains a read-ahead buffer to reduce HTTP round trips. When the current
  * position falls outside the buffered range, a new chunk is fetched.
- *
  */
-internal class AdlsSeekableInputStream(
-    private val fileClient: DataLakeFileClient,
+internal class BlobSeekableInputStream(
+    private val blobClient: BlobClient,
     private val fileSize: Long,
     private val chunkSize: Int
 ) : SeekableInputStream() {
@@ -153,9 +152,9 @@ internal class AdlsSeekableInputStream(
 
     private fun fetchChunk(startPosition: Long) {
         val rangeLength = minOf(chunkSize.toLong(), fileSize - startPosition)
-        val range = FileRange(startPosition, rangeLength)
+        val range = BlobRange(startPosition, rangeLength)
         val output = ByteArrayOutputStream(rangeLength.toInt())
-        fileClient.readWithResponse(output, range, null, null, false, null, null)
+        blobClient.downloadStreamWithResponse(output, range, null, null, false, null, null)
         val fetched = output.toByteArray()
         buffer = fetched
         bufferStart = startPosition

@@ -9,11 +9,13 @@ import org.apache.kafka.common.config.ConfigDef.Width
 import java.net.URI
 
 /**
- * [StorageProvider] for Azure ADLS Gen2 storage.
+ * [StorageProvider] for Azure Blob Storage.
  *
  * Handles `abfss://` URI scheme. Contributes Azure-specific config keys
  * (`azure.auth.type`, `azure.storage.account.name`, etc.) and creates
- * an [AdlsGen2LogStore] via [AdlsAuthConfigurer].
+ * an [AzureBlobLogStore] via [AzureBlobConfigurer].
+ *
+ * Works with both regular Blob storage accounts and ADLS Gen2 (HNS-enabled) accounts.
  */
 class AzureStorageProvider : StorageProvider {
 
@@ -91,20 +93,20 @@ class AzureStorageProvider : StorageProvider {
         val accountKey = props[AZURE_STORAGE_ACCOUNT_KEY] ?: ""
         val sasToken = props[AZURE_SAS_TOKEN] ?: ""
 
-        val authConfig = AdlsAuthConfig(
+        val config = AzureBlobConfig(
             authType = when (authType) {
-                "storage_key" -> AdlsAuthType.STORAGE_KEY
-                "sas_token" -> AdlsAuthType.SAS_TOKEN
-                "identity" -> AdlsAuthType.IDENTITY
-                else -> AdlsAuthType.IDENTITY
+                "storage_key" -> AzureAuthType.STORAGE_KEY
+                "sas_token" -> AzureAuthType.SAS_TOKEN
+                "identity" -> AzureAuthType.IDENTITY
+                else -> AzureAuthType.IDENTITY
             },
             accountName = accountName,
-            fileSystemName = container,
+            containerName = container,
             accountKey = accountKey.ifBlank { null },
             sasToken = sasToken.ifBlank { null }
         )
 
-        return AdlsAuthConfigurer.createLogStore(authConfig)
+        return AzureBlobConfigurer.createLogStore(config)
     }
 
     override fun parseBasePath(storagePath: String): String {
@@ -138,7 +140,7 @@ class AzureStorageProvider : StorageProvider {
             "Azure SAS token. Required when azure.auth.type=sas_token."
 
         /**
-         * Parse the container (filesystem) name from an abfss URI.
+         * Parse the container name from an abfss URI.
          */
         internal fun parseContainer(storagePath: String): String {
             require(storagePath.startsWith("abfss://")) {

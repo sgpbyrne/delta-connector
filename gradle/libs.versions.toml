@@ -5,7 +5,7 @@ parquet = "1.15.2"
 hadoop = "3.4.3"
 jackson = "2.17.2"
 avro = "1.12.0"
-azure-storage = "12.21.0"
+azure-blob = "12.28.1"
 azure-identity = "1.15.0"
 micrometer = "1.14.4"
 slf4j = "2.0.17"
@@ -17,7 +17,7 @@ mockk = "1.13.13"
 kotest = "5.9.1"
 
 # Plugins
-shadow = "8.1.1"
+shadow = "8.3.5"
 
 [libraries]
 # Protocol module deps
@@ -36,7 +36,7 @@ kafka-connect-api = { module = "org.apache.kafka:connect-api", version.ref = "ka
 kafka-connect-json = { module = "org.apache.kafka:connect-json", version.ref = "kafka" }
 
 # Azure
-azure-storage-datalake = { module = "com.azure:azure-storage-file-datalake", version.ref = "azure-storage" }
+azure-storage-blob = { module = "com.azure:azure-storage-blob", version.ref = "azure-blob" }
 azure-identity = { module = "com.azure:azure-identity", version.ref = "azure-identity" }
 
 # Observability
@@ -47,9 +47,10 @@ micrometer-otlp = { module = "io.micrometer:micrometer-registry-otlp", version.r
 # Test
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
-testcontainers-core = { module = "org.testcontainers:testcontainers" }
-testcontainers-kafka = { module = "org.testcontainers:kafka" }
-testcontainers-mssql = { module = "org.testcontainers:mssqlserver" }
+testcontainers-core = { module = "org.testcontainers:testcontainers", version.ref = "testcontainers" }
+testcontainers-junit = { module = "org.testcontainers:junit-jupiter", version.ref = "testcontainers" }
+testcontainers-kafka = { module = "org.testcontainers:kafka", version.ref = "testcontainers" }
+testcontainers-mssql = { module = "org.testcontainers:mssqlserver", version.ref = "testcontainers" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 kotest-assertions = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
@@ -61,4 +62,4 @@ testing = ["junit-jupiter", "mockk", "kotest-assertions"]
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-shadow = { id = "com.github.johnrengelman.shadow", version.ref = "shadow" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
