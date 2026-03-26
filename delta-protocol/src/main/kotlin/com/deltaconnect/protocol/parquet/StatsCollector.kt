@@ -2,6 +2,7 @@ package com.deltaconnect.protocol.parquet
 
 import com.deltaconnect.protocol.schema.DeltaType
 import com.deltaconnect.protocol.schema.StructField
+import com.deltaconnect.protocol.util.NestedFieldResolver
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.apache.avro.generic.GenericRecord
@@ -48,22 +49,9 @@ class StatsCollector(
     fun update(record: GenericRecord) {
         recordCount++
         for (col in columns) {
-            val value = resolveNestedValue(record, col.name)
+            val value = NestedFieldResolver.resolveGenericRecord(record, col.name)
             col.update(value)
         }
-    }
-
-    private fun resolveNestedValue(
-        record: GenericRecord,
-        path: String,
-    ): Any? {
-        val parts = path.split('.')
-        var current: Any? = record
-        for (part in parts) {
-            if (current == null) return null
-            current = (current as? GenericRecord)?.get(part) ?: return null
-        }
-        return current
     }
 
     /**

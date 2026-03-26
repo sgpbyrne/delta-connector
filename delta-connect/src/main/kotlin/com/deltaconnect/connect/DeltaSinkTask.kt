@@ -52,19 +52,17 @@ class DeltaSinkTask : SinkTask() {
     var metrics: ConnectorMetrics = ConnectorMetrics()
 
     private val tableWriters = mutableMapOf<String, TableWriter>()
-    private val tablePaths = mutableMapOf<String, String>() // topic → tablePath
+    private val tablePathsByTopic = mutableMapOf<String, String>()
     private val committedOffsets = mutableMapOf<TopicPartition, Long>()
     private var lastFlushTimeMs: Long = 0L
 
-    // Visible for testing: allows injecting custom factories
     var logStoreFactory: (DeltaSinkConfig) -> DeltaLogStore = ::createLogStoreFromProvider
     var converterFactory: (DeltaSinkConfig) -> RecordConverter = { cfg ->
         when (cfg.writeMode) {
-            DeltaSinkConfig.WriteMode.APPEND -> AppendRecordConverter()
+            DeltaSinkConfig.WriteMode.APPEND,
+            DeltaSinkConfig.WriteMode.UPSERT,
+            -> AppendRecordConverter()
             DeltaSinkConfig.WriteMode.CDC -> DebeziumRecordConverter(cfg.cdcEnvelopeFormat)
-            DeltaSinkConfig.WriteMode.UPSERT -> throw UnsupportedOperationException(
-                "UpsertRecordConverter not yet implemented",
-            )
         }
     }
     var clock: () -> Long = System::currentTimeMillis
@@ -140,7 +138,6 @@ class DeltaSinkTask : SinkTask() {
             val writer = getOrCreateWriter(tp.topic())
             val committedOffset = writer.getCommittedOffset(tp)
             if (committedOffset != null) {
-                // Seek past the last committed offset
                 seekOffsets[tp] = committedOffset + 1
                 this.committedOffsets[tp] = committedOffset
                 log.info(
@@ -233,7 +230,7 @@ class DeltaSinkTask : SinkTask() {
         log.info("Stopping DeltaSinkTask")
         flushAll()
         tableWriters.clear()
-        tablePaths.clear()
+        tablePathsByTopic.clear()
         committedOffsets.clear()
         metricsRegistry?.close()
         metricsRegistry = null
@@ -278,7 +275,7 @@ class DeltaSinkTask : SinkTask() {
         tableWriters.getOrPut(topic) {
             val tableName = DeltaSinkConfig.resolveTableName(config.tableName, topic)
             val tablePath = if (basePath.isEmpty()) tableName else "$basePath/$tableName"
-            tablePaths[topic] = tablePath
+            tablePathsByTopic[topic] = tablePath
             log.info("Creating TableWriter: topic={}, tablePath={}", topic, tablePath)
             TableWriter(
                 logStore = logStore,
@@ -296,7 +293,7 @@ class DeltaSinkTask : SinkTask() {
         writer: TableWriter,
     ) {
         MDC.put("topic", topic)
-        MDC.put("tablePath", tablePaths[topic] ?: "")
+        MDC.put("tablePath", tablePathsByTopic[topic] ?: "")
         try {
             val flushedOffsets = writer.flush()
             committedOffsets.putAll(flushedOffsets)
@@ -304,7 +301,7 @@ class DeltaSinkTask : SinkTask() {
 
             val sync = catalogSync
             if (sync != null) {
-                val path = tablePaths[topic]
+                val path = tablePathsByTopic[topic]
                 if (path != null) {
                     val tableName = DeltaSinkConfig.resolveTableName(config.tableName, topic)
                     val location = "${config.storagePath.trimEnd('/')}/$tableName"

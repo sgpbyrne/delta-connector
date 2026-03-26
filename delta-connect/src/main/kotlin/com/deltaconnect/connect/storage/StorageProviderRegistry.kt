@@ -99,7 +99,10 @@ object StorageProviderRegistry {
         try {
             val uri = URI(storagePath)
             uri.scheme?.lowercase() ?: "file"
-        } catch (_: Exception) {
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: Exception,
+        ) {
+            log.warn("Failed to parse storage path URI '{}', defaulting to file scheme", storagePath, e)
             "file"
         }
 }

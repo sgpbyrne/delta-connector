@@ -101,9 +101,9 @@ class TableWriter(
             partitionOffsets.size,
         )
 
-        ensureTable()
+        val currentTable = ensureTable()
 
-        val txn = table!!.startTransaction()
+        val txn = currentTable.startTransaction()
 
         val schemaEvolved = evolveSchemaIfNeeded(txn)
         if (schemaEvolved) {
@@ -138,7 +138,7 @@ class TableWriter(
             DeltaSinkConfig.WriteMode.CDC,
             DeltaSinkConfig.WriteMode.UPSERT,
             -> {
-                val snapshot = table!!.snapshot()
+                val snapshot = currentTable.snapshot()
                 val mergeResult = mergeEngine!!.merge(snapshot, writeRecords)
                 txn.addActions(mergeResult.removeFiles)
                 txn.addActions(mergeResult.addFiles)
@@ -257,8 +257,8 @@ class TableWriter(
         }
     }
 
-    private fun ensureTable() {
-        if (table != null) return
+    private fun ensureTable(): DeltaTable {
+        table?.let { return it }
 
         val firstRecord = buffer.first()
         val avroSchema = firstRecord.record.schema
@@ -289,6 +289,8 @@ class TableWriter(
         if (writeMode != DeltaSinkConfig.WriteMode.APPEND) {
             mergeEngine = DeltaMergeEngine(logStore, schema!!, mergeKeys, tablePath)
         }
+
+        return table!!
     }
 
     companion object {

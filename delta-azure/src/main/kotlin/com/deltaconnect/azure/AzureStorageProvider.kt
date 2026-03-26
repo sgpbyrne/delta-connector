@@ -26,7 +26,7 @@ class AzureStorageProvider : StorageProvider {
                 AZURE_AUTH_TYPE,
                 Type.STRING,
                 AZURE_AUTH_TYPE_DEFAULT,
-                ConfigDef.ValidString.`in`("storage_key", "sas_token", "identity"),
+                ConfigDef.ValidString.`in`(AUTH_TYPE_STORAGE_KEY, AUTH_TYPE_SAS_TOKEN, AUTH_TYPE_IDENTITY),
                 Importance.HIGH,
                 AZURE_AUTH_TYPE_DOC,
                 AZURE_GROUP,
@@ -78,23 +78,23 @@ class AzureStorageProvider : StorageProvider {
         }
 
         when (authType) {
-            "storage_key" -> {
+            AUTH_TYPE_STORAGE_KEY -> {
                 if (accountKey.isBlank()) {
                     errors.add(
                         "$AZURE_STORAGE_ACCOUNT_KEY is required " +
-                            "when $AZURE_AUTH_TYPE=storage_key",
+                            "when $AZURE_AUTH_TYPE=$AUTH_TYPE_STORAGE_KEY",
                     )
                 }
             }
-            "sas_token" -> {
+            AUTH_TYPE_SAS_TOKEN -> {
                 if (sasToken.isBlank()) {
                     errors.add(
                         "$AZURE_SAS_TOKEN is required " +
-                            "when $AZURE_AUTH_TYPE=sas_token",
+                            "when $AZURE_AUTH_TYPE=$AUTH_TYPE_SAS_TOKEN",
                     )
                 }
             }
-            "identity" -> {
+            AUTH_TYPE_IDENTITY -> {
                 // Uses DefaultAzureCredential. No checks required.
             }
         }
@@ -117,9 +117,9 @@ class AzureStorageProvider : StorageProvider {
             AzureBlobConfig(
                 authType =
                     when (authType) {
-                        "storage_key" -> AzureAuthType.STORAGE_KEY
-                        "sas_token" -> AzureAuthType.SAS_TOKEN
-                        "identity" -> AzureAuthType.IDENTITY
+                        AUTH_TYPE_STORAGE_KEY -> AzureAuthType.STORAGE_KEY
+                        AUTH_TYPE_SAS_TOKEN -> AzureAuthType.SAS_TOKEN
+                        AUTH_TYPE_IDENTITY -> AzureAuthType.IDENTITY
                         else -> AzureAuthType.IDENTITY
                     },
                 accountName = accountName,
@@ -147,7 +147,10 @@ class AzureStorageProvider : StorageProvider {
             "Authentication type: 'storage_key' (account key in config), " +
                 "'sas_token' (SAS token in config), or 'identity' " +
                 "(Uses DefaultAzureCredential chain: env vars, workload identity, managed identity)."
-        private const val AZURE_AUTH_TYPE_DEFAULT = "identity"
+        private const val AUTH_TYPE_STORAGE_KEY = "storage_key"
+        private const val AUTH_TYPE_SAS_TOKEN = "sas_token"
+        private const val AUTH_TYPE_IDENTITY = "identity"
+        private const val AZURE_AUTH_TYPE_DEFAULT = AUTH_TYPE_IDENTITY
 
         const val AZURE_STORAGE_ACCOUNT_NAME = "azure.storage.account.name"
         private const val AZURE_STORAGE_ACCOUNT_NAME_DOC =

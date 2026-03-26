@@ -21,13 +21,14 @@ class DeltaSinkConnector : SinkConnector() {
     private val log = LoggerFactory.getLogger(DeltaSinkConnector::class.java)
 
     private lateinit var configProps: Map<String, String>
+    private lateinit var config: DeltaSinkConfig
 
     override fun version(): String = VERSION
 
     override fun start(props: Map<String, String>) {
         log.info("Starting DeltaSinkConnector")
+        config = DeltaSinkConfig(props)
         configProps = props
-        DeltaSinkConfig(props)
         log.info(
             "DeltaSinkConnector started with storage.path={}, write.mode={}, merge.keys={}",
             props[DeltaSinkConfig.DELTA_STORAGE_PATH],

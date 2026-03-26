@@ -3,6 +3,7 @@ package com.deltaconnect.protocol.merge
 import com.deltaconnect.protocol.actions.AddFile
 import com.deltaconnect.protocol.schema.DeltaType
 import com.deltaconnect.protocol.schema.StructField
+import com.deltaconnect.protocol.util.NestedFieldResolver
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.slf4j.LoggerFactory
@@ -66,8 +67,8 @@ class FilePruner(
         @Suppress("LoopWithTooManyJumpStatements")
         for (field in mergeKeyFields) {
             val sourceBounds = sourceKeyBounds[field.name] ?: continue
-            val fileMin = resolveNestedNode(minValues, field.name)
-            val fileMax = resolveNestedNode(maxValues, field.name)
+            val fileMin = NestedFieldResolver.resolveJsonNode(minValues, field.name)
+            val fileMax = NestedFieldResolver.resolveJsonNode(maxValues, field.name)
 
             if (fileMin == null || fileMax == null || fileMin.isNull || fileMax.isNull) {
                 continue // Cannot prune due to missing stats
@@ -183,18 +184,6 @@ class FilePruner(
             logger.debug("Stats comparison failed for {}: {}", fieldType, e.message)
             null
         }
-    }
-
-    private fun resolveNestedNode(
-        node: JsonNode,
-        path: String,
-    ): JsonNode? {
-        val parts = path.split('.')
-        var current: JsonNode? = node
-        for (part in parts) {
-            current = current?.get(part) ?: return null
-        }
-        return current
     }
 
     private fun parseStats(statsJson: String?): JsonNode? {

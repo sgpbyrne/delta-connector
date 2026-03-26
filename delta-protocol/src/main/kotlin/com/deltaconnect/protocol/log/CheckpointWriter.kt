@@ -284,7 +284,18 @@ class CheckpointWriter(
         private fun extractRecordSchema(
             parentSchema: Schema,
             fieldName: String,
-        ): Schema = parentSchema.getField(fieldName).schema().types[1]
+        ): Schema {
+            val field =
+                requireNotNull(parentSchema.getField(fieldName)) {
+                    "Checkpoint schema missing expected field '$fieldName'"
+                }
+            val unionTypes = field.schema().types
+            require(unionTypes.size >= 2) {
+                "Expected union with at least 2 types for field '$fieldName', " +
+                    "got ${unionTypes.size}"
+            }
+            return unionTypes[1]
+        }
 
         private val CHECKPOINT_SCHEMA_JSON =
             """

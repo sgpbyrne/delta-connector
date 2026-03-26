@@ -5,6 +5,7 @@ import org.apache.avro.generic.GenericData
 import org.apache.avro.generic.GenericRecord
 import org.apache.kafka.connect.data.Schema
 import org.apache.kafka.connect.data.Struct
+import org.slf4j.LoggerFactory
 import java.math.BigDecimal
 import java.nio.ByteBuffer
 import org.apache.avro.Schema as AvroSchema
@@ -21,6 +22,7 @@ import org.apache.kafka.connect.data.Timestamp as ConnectTimestamp
  * other databases).
  */
 object ConnectToAvroConverter {
+    private val log = LoggerFactory.getLogger(ConnectToAvroConverter::class.java)
     private const val DEFAULT_DECIMAL_PRECISION = 38
 
     /**
@@ -85,6 +87,7 @@ object ConnectToAvroConverter {
         val logicalName = schema.name()
         if (logicalName != null) {
             logicalTypeToAvro(logicalName, schema)?.let { return it }
+            log.debug("Unrecognized logical type '{}', falling through to primitive conversion", logicalName)
         }
         return connectPrimitiveToAvro(schema)
     }
